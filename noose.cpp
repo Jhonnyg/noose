@@ -122,6 +122,11 @@ void noose::reset_rom(noose::rom* rom)
     memset(rom, 0, sizeof(*rom));
 }
 
+void noose::debug(const char* debug_str)
+{
+    printf("[DEBUG] %s\n", debug_str);
+}
+
 void noose::error(const char* error_str)
 {
     printf("[ERROR] %s\n", error_str);

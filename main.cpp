@@ -5,6 +5,82 @@
 
 #include "noose.h"
 
+struct command
+{
+    enum command_id
+    {
+        NO_COMMAND = 0,
+        VERIFY_CPU,
+        PRINT_HEADER
+    } id;
+
+    command* next;
+};
+
+command* make_command(command::command_id id, command* next)
+{
+    command* cmd = (command*) malloc(sizeof(command));
+    cmd->id = id;
+    cmd->next = next;
+    return cmd;
+}
+
+command* get_commands(int argc, char const *argv[])
+{
+    command* last_cmd = make_command(command::NO_COMMAND, 0);
+
+    for (int i = 1; i < argc; ++i)
+    {
+        const char* arg = argv[i];
+
+        if (arg[0] == '-')
+        {
+            if (strcmp(arg, "-verify") == 0)
+            {
+                noose::debug("CMD - Verify ROM");
+                last_cmd = make_command(command::VERIFY_CPU, last_cmd);
+            }
+            else if (strcmp(arg, "-print_header") == 0)
+            {
+                noose::debug("CMD - Print Header");
+                last_cmd = make_command(command::PRINT_HEADER, last_cmd);
+            }
+        }
+    }
+
+    return last_cmd;
+}
+
+void delete_commands(command* cmd)
+{
+    command* c = cmd;
+    while(c->next)
+    {
+        command* nxt = c->next;
+        free(c);
+        c = nxt;
+    }
+}
+
+void process_commands(command* cmd, noose::rom rom)
+{
+    command* it = cmd;
+    while(it)
+    {
+        switch(it->id)
+        {
+            case command::VERIFY_CPU:
+                break;
+            case command::PRINT_HEADER:
+                noose::print_header(rom.header);
+                break;
+            default:break;
+        }
+
+        it = it->next;
+    }
+}
+
 int main(int argc, char const *argv[])
 {
     if (argc < 2)
@@ -21,8 +97,13 @@ int main(int argc, char const *argv[])
         noose::error(noose::last_error());
     }
 
-    noose::print_header(rom.header);
+    command* cmd = get_commands(argc, argv);
+
+    process_commands(cmd, rom);
+
     noose::reset_rom(&rom);
+
+    delete_commands(cmd);
 
     return 0;
 }

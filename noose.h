@@ -56,6 +56,7 @@ namespace noose
 
     bool load_rom(const char* path, rom* output);
     void reset_rom(noose::rom* rom);
+    void debug(const char* debug_str);
     void error(const char* error_str);
     void print_help();
     void print_header(const header h);
