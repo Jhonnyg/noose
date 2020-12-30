@@ -9,10 +9,10 @@ static char error_buffer[512] = {};
 
 static void set_last_error(const char* error_str)
 {
-	size_t error_str_size = strlen(error_str);
-	assert(error_str_size < sizeof(error_buffer));
-	memcpy(error_buffer, error_str, error_str_size);
-	error_buffer[error_str_size] = '\0';
+    size_t error_str_size = strlen(error_str);
+    assert(error_str_size < sizeof(error_buffer));
+    memcpy(error_buffer, error_str, error_str_size);
+    error_buffer[error_str_size] = '\0';
 }
 
 static bool has_magic_number(noose::header header)
@@ -32,13 +32,13 @@ static bool has_magic_number(noose::header header)
 
 static bool load_file(const char* path, uint8_t** buffer_out, uint32_t* buffer_size)
 {
-	FILE* f = fopen(path, "r");
+    FILE* f = fopen(path, "r");
 
-	if (f == NULL)
-	{
-		set_last_error("Unable to open file");
-		return false;
-	}
+    if (f == NULL)
+    {
+        set_last_error("Unable to open file");
+        return false;
+    }
 
     fseek(f, 0, SEEK_END);
     size_t f_size = ftell(f);
@@ -47,8 +47,8 @@ static bool load_file(const char* path, uint8_t** buffer_out, uint32_t* buffer_s
     *buffer_size = f_size;
     if (fread(*buffer_out, sizeof(uint8_t), f_size, f) != f_size)
     {
-    	set_last_error("Couldn't read all bytes in ROM");
-    	return true;
+        set_last_error("Couldn't read all bytes in ROM");
+        return true;
     }
     fclose(f);
 
@@ -57,15 +57,15 @@ static bool load_file(const char* path, uint8_t** buffer_out, uint32_t* buffer_s
 
 bool noose::load_rom(const char* path, noose::rom* output)
 {
-	uint8_t* buffer = 0;
-	uint32_t buffer_size = 0;
+    uint8_t* buffer = 0;
+    uint32_t buffer_size = 0;
 
-	if (!load_file(path, &buffer, &buffer_size))
-	{
-		return false;
-	}
+    if (!load_file(path, &buffer, &buffer_size))
+    {
+        return false;
+    }
 
-	memcpy(&output->header, buffer, sizeof(noose::header));
+    memcpy(&output->header, buffer, sizeof(noose::header));
 
     if (!has_magic_number(output->header))
     {
@@ -104,39 +104,39 @@ bool noose::load_rom(const char* path, noose::rom* output)
 
     output->mapper_id = noose::header::mapper_number_lower(output->header) | (noose::header::mapper_number_higher(output->header) << 4);
 
-	return true;
+    return true;
 }
 
 void noose::reset_rom(noose::rom* rom)
 {
-	if (rom->data_prg)
-	{
-		free(rom->data_prg);
-	}
+    if (rom->data_prg)
+    {
+        free(rom->data_prg);
+    }
 
-	if (rom->data_chr)
-	{
-		free(rom->data_chr);
-	}
+    if (rom->data_chr)
+    {
+        free(rom->data_chr);
+    }
 
-	memset(rom, 0, sizeof(*rom));
+    memset(rom, 0, sizeof(*rom));
 }
 
 void noose::error(const char* error_str)
 {
-	printf("[ERROR] %s\n", error_str);
+    printf("[ERROR] %s\n", error_str);
 }
 
 void noose::print_help()
 {
-	printf("\n");
-	printf("To use, call noose like this:\n");
-	printf("noose <path-to-nes-file>\n");
+    printf("\n");
+    printf("To use, call noose like this:\n");
+    printf("noose <path-to-nes-file>\n");
 }
 
 void noose::print_header(const noose::header header)
 {
-	const char* tv_system_lut[] = {"NTCS", "PAL", "Dual Compatible"};
+    const char* tv_system_lut[] = {"NTCS", "PAL", "Dual Compatible"};
 
     printf("Magic                          : %s\n", header.magic);
     printf("Page count (PRG)               : %d\n", header.page_count_prg);
@@ -165,5 +165,5 @@ void noose::print_header(const noose::header header)
 
 const char* noose::last_error()
 {
-	return error_buffer;
+    return error_buffer;
 }
