@@ -5,6 +5,12 @@
 
 #include "noose.h"
 
+static struct s_cpu
+{
+    int8_t pc;
+    uint8_t initialized : 1;
+} cpu;
+
 static char error_buffer[512] = {};
 
 static void set_last_error(const char* error_str)
@@ -53,6 +59,12 @@ static bool load_file(const char* path, uint8_t** buffer_out, uint32_t* buffer_s
     fclose(f);
 
     return true;
+}
+
+static void initialize()
+{
+    memset(&cpu, 0, sizeof(cpu));
+    cpu.initialized = 1;
 }
 
 bool noose::load_rom(const char* path, noose::rom* output)
@@ -120,6 +132,22 @@ void noose::reset_rom(noose::rom* rom)
     }
 
     memset(rom, 0, sizeof(*rom));
+}
+
+bool noose::verify_rom(const noose::rom* rom, const char* verify_log_path)
+{
+    char* buffer = 0;
+    uint32_t buffer_size = 0;
+    if (!load_file(verify_log_path, (uint8_t**) &buffer, &buffer_size))
+    {
+        set_last_error("Unable to load verification file");
+        return false;
+    }
+
+    initialize();
+
+    free(buffer);
+    return true;
 }
 
 void noose::debug(const char* debug_str)
