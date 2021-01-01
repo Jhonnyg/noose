@@ -5,20 +5,39 @@
 
 #include "noose.h"
 
-static struct s_cpu
+namespace cpu
 {
-    int8_t pc;
-    uint8_t initialized : 1;
-} cpu;
+    static uint8_t  rom[32767]; // $8000-$FFFF
+    static uint8_t  ram[2048];  // 2kb main RAM
+    static uint8_t  a;          // accumulator register
+    static uint8_t  x;          // index register x
+    static uint8_t  y;          // index register y
+    static uint8_t  p;          // cpu status flags
+    static uint8_t  sp;         // stack pointer
+    static uint16_t pc;         // program counter
+
+    static void initialize()
+    {
+        memset(ram, 0, sizeof(ram));
+        memset(rom, 0, sizeof(rom));
+        a  = 0;
+        x  = 0;
+        y  = 0;
+        p  = 34;
+        sp = 0xFD;
+        pc = 0;
+    }
+}
 
 static char error_buffer[512] = {};
 
-static void set_last_error(const char* error_str)
+static bool set_last_error(const char* error_str)
 {
     size_t error_str_size = strlen(error_str);
     assert(error_str_size < sizeof(error_buffer));
     memcpy(error_buffer, error_str, error_str_size);
     error_buffer[error_str_size] = '\0';
+    return false;
 }
 
 static bool has_magic_number(noose::header header)
@@ -42,8 +61,7 @@ static bool load_file(const char* path, uint8_t** buffer_out, uint32_t* buffer_s
 
     if (f == NULL)
     {
-        set_last_error("Unable to open file");
-        return false;
+        return set_last_error("Unable to open file");
     }
 
     fseek(f, 0, SEEK_END);
@@ -53,18 +71,11 @@ static bool load_file(const char* path, uint8_t** buffer_out, uint32_t* buffer_s
     *buffer_size = f_size;
     if (fread(*buffer_out, sizeof(uint8_t), f_size, f) != f_size)
     {
-        set_last_error("Couldn't read all bytes in ROM");
-        return true;
+        return set_last_error("Couldn't read all bytes in ROM");
     }
     fclose(f);
 
     return true;
-}
-
-static void initialize()
-{
-    memset(&cpu, 0, sizeof(cpu));
-    cpu.initialized = 1;
 }
 
 bool noose::load_rom(const char* path, noose::rom* output)
@@ -81,8 +92,7 @@ bool noose::load_rom(const char* path, noose::rom* output)
 
     if (!has_magic_number(output->header))
     {
-        set_last_error("Invalid header, no magic number");
-        return false;
+        return set_last_error("Invalid header, no magic number");
     }
 
     uint32_t cursor = sizeof(noose::header);
@@ -136,17 +146,25 @@ void noose::reset_rom(noose::rom* rom)
 
 bool noose::verify_rom(const noose::rom* rom, const char* verify_log_path)
 {
-    char* buffer = 0;
-    uint32_t buffer_size = 0;
-    if (!load_file(verify_log_path, (uint8_t**) &buffer, &buffer_size))
+    cpu::initialize();
+
+    // Start up state
+    cpu::p  = 24; // Should be 34, but not for nestest apparently..
+    cpu::pc = 0xC000;
+
+    FILE* f = fopen(verify_log_path, "r");
+    if (f == NULL)
     {
-        set_last_error("Unable to load verification file");
-        return false;
+        return set_last_error("Unable to open verification log file");
     }
 
-    initialize();
+    char buffer[256];
+    while(fgets(buffer, sizeof(buffer), f) != NULL)
+    {
+        printf("%s", buffer);
+    }
 
-    free(buffer);
+    fclose(f);
     return true;
 }
 
