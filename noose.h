@@ -63,6 +63,7 @@ namespace noose
     void print_header(const header h);
 
     const char* last_error();
+    bool has_errors();
 }
 
 #endif /* __NOOSE_H__ */

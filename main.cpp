@@ -83,7 +83,10 @@ namespace app
                     if (!noose::verify_rom(&rom, cmd->data.verify_log_path))
                     {
                         noose::error("Verification failed, reason:");
-                        noose::error(noose::last_error());
+                        while(noose::has_errors())
+                        {
+                            noose::error(noose::last_error());
+                        }
                     }
                     break;
                 case command::PRINT_HEADER:
@@ -111,7 +114,10 @@ int main(int argc, char const *argv[])
     if (!noose::load_rom(argv[1], &rom))
     {
         noose::error("Unable to load rom, reason:");
-        noose::error(noose::last_error());
+        while(noose::has_errors())
+        {
+            noose::error(noose::last_error());
+        }
     }
 
     app::command* cmd = app::get_commands(argc, argv);

@@ -5,6 +5,9 @@
 
 #include "noose.h"
 
+static const uint32_t prg_block_size = 16384;
+static const uint32_t chr_block_size = 8192;
+
 namespace cpu
 {
     enum func_type
@@ -38,7 +41,6 @@ namespace cpu
         const char* name;
         func_type   type;
         func_ptr    fn;
-        uint8_t     operand_count;
         uint8_t     cycle_count;
     };
 
@@ -65,7 +67,7 @@ namespace cpu
     static uint16_t pc;             // program counter
 
     static instruction instruction_current;
-    static uint8_t     instruction_data[16];
+    static uint8_t     instruction_data[2];
 
     static uint8_t read_memory(uint16_t addr)
     {
@@ -77,24 +79,24 @@ namespace cpu
         return 0;
     }
 
-    static uint8_t get_address_byte(address_mode mode, uint16_t addr)
+    static uint8_t read_instruction(address_mode mode, uint16_t op)
     {
         switch(mode)
         {
-            case accumulator: assert(0 && "get_address_byte: accumulator not implemented"); return 0;
-            case absolute: return read_memory(addr);
-            case absolute_x_indexed: assert(0 && "get_address_byte: absolute_x_indexed not implemented"); return 0;
-            case absolute_y_indexed: assert(0 && "get_address_byte: absolute_y_indexed not implemented"); return 0;
-            case immediate: assert(0 && "get_address_byte: immediate not implemented"); return 0;
-            case implied: assert(0 && "get_address_byte: implied not implemented"); return 0;
-            case indirect: assert(0 && "get_address_byte: indirect not implemented"); return 0;
-            case x_indexed_indirect: assert(0 && "get_address_byte: x_indexed_indirect not implemented"); return 0;
-            case indirect_y_indexed: assert(0 && "get_address_byte: indirect_y_indexed not implemented"); return 0;
-            case relative: assert(0 && "get_address_byte: relative not implemented"); return 0;
-            case zeropage: assert(0 && "get_address_byte: zeropage not implemented"); return 0;
-            case zeropage_x_indexed: assert(0 && "get_address_byte: zeropage_x_indexed not implemented"); return 0;
-            case zeropage_y_indexed: assert(0 && "get_address_byte: zeropage_y_indexed not implemented"); return 0;
-            case unused: assert(0 && "get_address_byte: unused not implemented"); return 0;
+            case accumulator:        assert(0 && "read_instruction: accumulator not implemented"); return 0;
+            case absolute:           return read_memory(op);
+            case absolute_x_indexed: assert(0 && "read_instruction: absolute_x_indexed not implemented"); return 0;
+            case absolute_y_indexed: assert(0 && "read_instruction: absolute_y_indexed not implemented"); return 0;
+            case immediate:          return (uint8_t) op;
+            case implied:            assert(0 && "read_instruction: implied not implemented"); return 0;
+            case indirect:           assert(0 && "read_instruction: indirect not implemented"); return 0;
+            case x_indexed_indirect: assert(0 && "read_instruction: x_indexed_indirect not implemented"); return 0;
+            case indirect_y_indexed: assert(0 && "read_instruction: indirect_y_indexed not implemented"); return 0;
+            case relative:           assert(0 && "read_instruction: relative not implemented"); return 0;
+            case zeropage:           assert(0 && "read_instruction: zeropage not implemented"); return 0;
+            case zeropage_x_indexed: assert(0 && "read_instruction: zeropage_x_indexed not implemented"); return 0;
+            case zeropage_y_indexed: assert(0 && "read_instruction: zeropage_y_indexed not implemented"); return 0;
+            case unused:             assert(0 && "read_instruction: unused not implemented"); return 0;
         }
 
         return 0;
@@ -119,11 +121,11 @@ namespace cpu
                 pc += 0x01;
                 break;
             case 1:
-                instruction_data[0] = get_address_byte(instruction_current.address_mode, pc);
+                instruction_data[0] = read_instruction(instruction_current.address_mode, pc);
                 pc += 0x01;
                 break;
             case 2:
-                instruction_data[1] = get_address_byte(instruction_current.address_mode, pc);
+                instruction_data[1] = read_instruction(instruction_current.address_mode, pc);
                 pc                  = make_address(instruction_data[1], instruction_data[0]);
                 break;
         }
@@ -145,46 +147,46 @@ namespace cpu
                 pc += 0x01;
                 break;
             case 1:
-                instruction_data[0] = get_address_byte(instruction_current.address_mode, pc);
+                instruction_data[0] = read_instruction(instruction_current.address_mode, pc);
                 pc += 0x01;
                 break;
             case 2:
-                instruction_data[1] = get_address_byte(instruction_current.address_mode, pc);
+                instruction_data[1] = read_instruction(instruction_current.address_mode, pc);
                 pc += 0x01;
                 break;
             case 3:
-                x = get_address_byte(instruction_current.address_mode, make_address(instruction_data[1], instruction_data[0]));
+                x = read_instruction(instruction_current.address_mode, make_address(instruction_data[1], instruction_data[0]));
                 break;
         }
     }
 
     static instruction_meta instruction_meta_table[] = {
-        { "NOP", NOP, func_fn_nop, 0, 0 },
-        { "BIT", NOP, func_fn_nop, 0, 0 },
-        { "JMP", JMP, func_fn_jmp, 2, 3 },
-        { "JMP_ABS", NOP, func_fn_nop, 2, 3 },
-        { "STY", NOP, func_fn_nop, 2, 3 },
-        { "LDY", NOP, func_fn_nop, 2, 3 },
-        { "CPY", NOP, func_fn_nop, 2, 3 },
-        { "CPX", NOP, func_fn_nop, 2, 3 },
+        { "NOP",     NOP, func_fn_nop, 0 },
+        { "BIT",     NOP, func_fn_nop, 0 },
+        { "JMP",     JMP, func_fn_jmp, 3 },
+        { "JMP_ABS", NOP, func_fn_nop, 3 },
+        { "STY",     NOP, func_fn_nop, 3 },
+        { "LDY",     NOP, func_fn_nop, 3 },
+        { "CPY",     NOP, func_fn_nop, 3 },
+        { "CPX",     NOP, func_fn_nop, 3 },
         // 01
-        { "ORA", NOP, func_fn_nop, 2, 3 },
-        { "AND", NOP, func_fn_nop, 2, 3 },
-        { "EOR", NOP, func_fn_nop, 2, 3 },
-        { "ADC", NOP, func_fn_nop, 2, 3 },
-        { "STA", NOP, func_fn_nop, 2, 3 },
-        { "LDA", NOP, func_fn_nop, 2, 3 },
-        { "CMP", NOP, func_fn_nop, 2, 3 },
-        { "SBC", NOP, func_fn_nop, 2, 3 },
+        { "ORA",     NOP, func_fn_nop, 3 },
+        { "AND",     NOP, func_fn_nop, 3 },
+        { "EOR",     NOP, func_fn_nop, 3 },
+        { "ADC",     NOP, func_fn_nop, 3 },
+        { "STA",     NOP, func_fn_nop, 3 },
+        { "LDA",     NOP, func_fn_nop, 3 },
+        { "CMP",     NOP, func_fn_nop, 3 },
+        { "SBC",     NOP, func_fn_nop, 3 },
         // 10
-        { "ASL", NOP, func_fn_nop, 2, 3 },
-        { "ROL", NOP, func_fn_nop, 2, 3 },
-        { "LSR", NOP, func_fn_nop, 2, 3 },
-        { "ROR", NOP, func_fn_nop, 2, 3 },
-        { "STX", NOP, func_fn_nop, 2, 3 },
-        { "LDX", LDX, func_fn_ldx, 2, 3 },
-        { "DEC", NOP, func_fn_nop, 2, 3 },
-        { "INC", NOP, func_fn_nop, 2, 3 },
+        { "ASL",     NOP, func_fn_nop, 3 },
+        { "ROL",     NOP, func_fn_nop, 3 },
+        { "LSR",     NOP, func_fn_nop, 3 },
+        { "ROR",     NOP, func_fn_nop, 3 },
+        { "STX",     NOP, func_fn_nop, 3 },
+        { "LDX",     LDX, func_fn_ldx, 3 },
+        { "DEC",     NOP, func_fn_nop, 3 },
+        { "INC",     NOP, func_fn_nop, 3 },
     };
 
     static void initialize()
@@ -248,14 +250,12 @@ namespace cpu
         const uint8_t cc_bits  = 0x03;
         const uint8_t bbb_bits = 0x07;
         const uint8_t aaa_bits = 0x07;
-        uint8_t inst_hex = read_memory(pc);
-
         instruction inst;
         memset(&inst, 0, sizeof(inst));
-        inst.code         = inst_hex;
-        inst.cc           = inst_hex & cc_bits;
-        inst.bbb          = (inst_hex >> 2) & bbb_bits;
-        inst.aaa          = (inst_hex >> 5) & aaa_bits;
+        inst.code         = read_memory(pc);
+        inst.cc           = inst.code & cc_bits;
+        inst.bbb          = (inst.code >> 2) & bbb_bits;
+        inst.aaa          = (inst.code >> 5) & aaa_bits;
         inst.address_mode = get_address_mode(inst);
 
         switch(inst.cc)
@@ -287,17 +287,30 @@ namespace cpu
     }
 }
 
-static const uint32_t prg_block_size = 16384;
-static const uint32_t chr_block_size = 8192;
-static char error_buffer[512] = {};
-
-static bool set_last_error(const char* error_str)
+static struct s_pgm_error
 {
+    char msg[512];
+    s_pgm_error* next;
+} error_head = {};
+
+static void add_error(const char* error_str)
+{
+    s_pgm_error* error = (s_pgm_error*) malloc(sizeof(s_pgm_error));
+
+    s_pgm_error* parent = &error_head;
+
+    while(parent->next)
+    {
+        parent = parent->next;
+    }
+
+    parent->next = error;
+    error->next = 0;
+
     size_t error_str_size = strlen(error_str);
-    assert(error_str_size < sizeof(error_buffer));
-    memcpy(error_buffer, error_str, error_str_size);
-    error_buffer[error_str_size] = '\0';
-    return false;
+    assert(error_str_size < sizeof(error->msg));
+    memcpy(error->msg, error_str, error_str_size);
+    error->msg[error_str_size] = '\0';
 }
 
 static bool has_magic_number(noose::header header)
@@ -321,7 +334,8 @@ static bool load_file(const char* path, uint8_t** buffer_out, uint32_t* buffer_s
 
     if (f == NULL)
     {
-        return set_last_error("Unable to open file");
+        add_error("Unable to open file");
+        return false;
     }
 
     fseek(f, 0, SEEK_END);
@@ -331,7 +345,8 @@ static bool load_file(const char* path, uint8_t** buffer_out, uint32_t* buffer_s
     *buffer_size = f_size;
     if (fread(*buffer_out, sizeof(uint8_t), f_size, f) != f_size)
     {
-        return set_last_error("Couldn't read all bytes in ROM");
+        add_error("Couldn't read all bytes in ROM");
+        return false;
     }
     fclose(f);
 
@@ -352,7 +367,8 @@ bool noose::load_rom(const char* path, noose::rom* output)
 
     if (!has_magic_number(output->header))
     {
-        return set_last_error("Invalid header, no magic number");
+        add_error("Invalid header, no magic number");
+        return false;
     }
 
     uint32_t cursor = sizeof(noose::header);
@@ -401,6 +417,55 @@ void noose::reset_rom(noose::rom* rom)
     memset(rom, 0, sizeof(*rom));
 }
 
+static void dbg_write_instruction_to_buffer(const instruction i, char* buffer, uint8_t op0, uint8_t op1)
+{
+    switch(i.address_mode)
+    {
+        case accumulator:
+            sprintf(buffer, "accumulator");
+            break;
+        case absolute:
+            sprintf(buffer, "absolute");
+            break;
+        case absolute_x_indexed:
+            sprintf(buffer, "absolute_x_indexed");
+            break;
+        case absolute_y_indexed:
+            sprintf(buffer, "absolute_y_indexed");
+            break;
+        case immediate:
+            sprintf(buffer, "immediate");
+            break;
+        case implied:
+            sprintf(buffer, "implied");
+            break;
+        case indirect:
+            sprintf(buffer, "indirect");
+            break;
+        case x_indexed_indirect:
+            sprintf(buffer, "x_indexed_indirect");
+            break;
+        case indirect_y_indexed:
+            sprintf(buffer, "indirect_y_indexed");
+            break;
+        case relative:
+            sprintf(buffer, "relative");
+            break;
+        case zeropage:
+            sprintf(buffer, "zeropage");
+            break;
+        case zeropage_x_indexed:
+            sprintf(buffer, "zeropage_x_indexed");
+            break;
+        case zeropage_y_indexed:
+            sprintf(buffer, "zeropage_y_indexed");
+            break;
+        case unused:
+            sprintf(buffer, "unused");
+            break;
+    }
+}
+
 bool noose::verify_rom(const noose::rom* rom, const char* verify_log_path)
 {
     cpu::initialize();
@@ -412,7 +477,8 @@ bool noose::verify_rom(const noose::rom* rom, const char* verify_log_path)
     FILE* f = fopen(verify_log_path, "r");
     if (f == NULL)
     {
-        return set_last_error("Unable to open verification log file");
+        add_error("Unable to open verification log file");
+        return false;
     }
 
     memcpy(cpu::prg_rom, rom->data_prg, rom->header.page_count_prg * prg_block_size);
@@ -421,9 +487,10 @@ bool noose::verify_rom(const noose::rom* rom, const char* verify_log_path)
 
     printf("PC: %x\n", cpu::pc);
 
+    bool abort = false;
     char buffer_log[256];
     char buffer_noose[256];
-    while(fgets(buffer_log, sizeof(buffer_log), f) != NULL)
+    while(fgets(buffer_log, sizeof(buffer_log), f) != NULL && !abort)
     {
         cpu::instruction next = cpu::get_next_instruction();
 
@@ -438,6 +505,7 @@ bool noose::verify_rom(const noose::rom* rom, const char* verify_log_path)
 
         cpu::execute(next);
 
+        /*
         char op0[3] = "  ";
         char op1[3] = "  ";
         char instruction_str[32];
@@ -453,18 +521,68 @@ bool noose::verify_rom(const noose::rom* rom, const char* verify_log_path)
         {
             sprintf(op1, "%X", cpu::read_memory(pc + 2));
         }
+        */
+
+        F5 C5  JMP $C5F5
+
+        char instruction_str[40] = {};
+
+        dbg_write_instruction_to_buffer(next, buffer_noose, )
 
         sprintf(buffer_noose, "%X  %X %s %s  %-32sA:%02X X:%02X Y:%02X P:%02X SP:%02X PPU:%3d,%3d CYC:%d\n",
             pc, next.code, op0, op1, instruction_str, reg_a, reg_x, reg_y, p, sp, ppu_x, ppu_y, cycle_count);
 
-        printf("%s", buffer_noose);
-        printf("%s", buffer_log);
+        #define COLOR_NRM  "\x1B[0m"
+        #define COLOR_RED  "\x1B[31m"
+        #define COLOR_GRN  "\x1B[32m"
+
+        uint16_t cursor = 0;
+        const char* last_color = COLOR_NRM;
+
+        while(buffer_log[cursor] && cursor <= sizeof(buffer_log))
+        {
+            if (buffer_noose[cursor] == buffer_log[cursor])
+            {
+                if (last_color != COLOR_GRN)
+                {
+                    printf("%s", COLOR_GRN);
+                    last_color = COLOR_GRN;
+                }
+
+                printf("%c", buffer_log[cursor]);
+            }
+            else
+            {
+                if (last_color != COLOR_RED)
+                {
+                    printf("%s", COLOR_RED);
+                    last_color = COLOR_RED;
+                }
+
+                printf("%c", buffer_log[cursor]);
+                abort = 1;
+            }
+
+            cursor++;
+        }
+
+        printf("%s\n", COLOR_NRM);
+
+        if (abort)
+        {
+            add_error("Input string:");
+            add_error(buffer_noose);
+        }
+
+        #undef COLOR_NRM
+        #undef COLOR_RED
+        #undef COLOR_GRN
 
         cycle_count += next.meta.cycle_count;
     }
 
     fclose(f);
-    return true;
+    return !abort;
 }
 
 void noose::debug(const char* debug_str)
@@ -513,7 +631,25 @@ void noose::print_header(const noose::header header)
     printf("Flag 10 (Bus Conflict)         : %s\n", noose::header::bus_conflict(header) ? "Has Conflict" : "No Conflict");
 }
 
+static char error_buffer[512];
+
+bool noose::has_errors()
+{
+    return error_head.next != 0;
+}
+
 const char* noose::last_error()
 {
-    return error_buffer;
+    s_pgm_error* e = error_head.next;
+    if (e)
+    {
+        size_t len = strlen(e->msg);
+        assert(len < sizeof(error_buffer));
+        memcpy(error_buffer, e->msg, len);
+        error_buffer[len] = '\0';
+        error_head.next = e->next;
+        free(e);
+        return error_buffer;
+    }
+    return 0;
 }
