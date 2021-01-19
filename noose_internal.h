@@ -84,16 +84,13 @@ namespace noose
         struct s_instruction
         {
             address_mode address_mode;
-            union
+            uint8_t code;
+            struct
             {
-                uint8_t code;
-                struct
-                {
-                    uint8_t aaa : 3;
-                    uint8_t bbb : 3;
-                    uint8_t cc  : 2;
-                } bits;
-            };
+                uint8_t aaa : 3;
+                uint8_t bbb : 3;
+                uint8_t cc  : 2;
+            } bits;
         };
 
         struct s_instruction_meta
@@ -118,6 +115,7 @@ namespace noose
         void             initialize(const noose::rom* rom);
         instruction      get_next_instruction();
         instruction_meta get_instruction_meta(const instruction inst);
+        uint8_t          read_address(cpu::address_mode mode, uint16_t op);
         void             execute(const instruction inst);
     }
 }

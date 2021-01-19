@@ -101,29 +101,6 @@ static uint8_t read_memory(uint16_t addr)
     return 0;
 }
 
-static uint8_t read_address(cpu::address_mode mode, uint16_t op)
-{
-    switch(mode)
-    {
-        case cpu::MODE_ACCUMULATOR:        assert(0 && "read_instruction: accumulator not implemented"); return 0;
-        case cpu::MODE_ABSOLUTE:           return read_memory(op);
-        case cpu::MODE_ABSOLUTE_X_INDEXED: assert(0 && "read_instruction: absolute_x_indexed not implemented"); return 0;
-        case cpu::MODE_ABSOLUTE_y_INDEXED: assert(0 && "read_instruction: absolute_y_indexed not implemented"); return 0;
-        case cpu::MODE_IMMEDIATE:          return (uint8_t) op;
-        case cpu::MODE_IMPLIED:            assert(0 && "read_instruction: implied not implemented"); return 0;
-        case cpu::MODE_INDIRECT:           assert(0 && "read_instruction: indirect not implemented"); return 0;
-        case cpu::MODE_X_INDEXED_INDIRECT: assert(0 && "read_instruction: x_indexed_indirect not implemented"); return 0;
-        case cpu::MODE_INDIRECT_Y_INDEXED: assert(0 && "read_instruction: indirect_y_indexed not implemented"); return 0;
-        case cpu::MODE_RELATIVE:           assert(0 && "read_instruction: relative not implemented"); return 0;
-        case cpu::MODE_ZEROPAGE:           assert(0 && "read_instruction: zeropage not implemented"); return 0;
-        case cpu::MODE_ZEROPAGE_X_INDEXED: assert(0 && "read_instruction: zeropage_x_indexed not implemented"); return 0;
-        case cpu::MODE_ZEROPAGE_Y_INDEXED: assert(0 && "read_instruction: zeropage_y_indexed not implemented"); return 0;
-        case cpu::MODE_UNUSED:             assert(0 && "read_instruction: unused not implemented"); return 0;
-    }
-
-    return 0;
-}
-
 static void fill_action_list(const cpu::instruction_meta meta, cpu::action* action_list_out)
 {
     switch(meta.type)
@@ -195,6 +172,29 @@ void cpu::initialize(const rom* rom)
     memcpy(prg_rom, rom->data_prg, rom->header.page_count_prg * BLOCK_SIZE_PRG);
 }
 
+uint8_t cpu::read_address(cpu::address_mode mode, uint16_t op)
+{
+    switch(mode)
+    {
+        case cpu::MODE_ACCUMULATOR:        assert(0 && "read_instruction: accumulator not implemented"); return 0;
+        case cpu::MODE_ABSOLUTE:           return read_memory(op);
+        case cpu::MODE_ABSOLUTE_X_INDEXED: assert(0 && "read_instruction: absolute_x_indexed not implemented"); return 0;
+        case cpu::MODE_ABSOLUTE_y_INDEXED: assert(0 && "read_instruction: absolute_y_indexed not implemented"); return 0;
+        case cpu::MODE_IMMEDIATE:          return (uint8_t) op;
+        case cpu::MODE_IMPLIED:            assert(0 && "read_instruction: implied not implemented"); return 0;
+        case cpu::MODE_INDIRECT:           assert(0 && "read_instruction: indirect not implemented"); return 0;
+        case cpu::MODE_X_INDEXED_INDIRECT: assert(0 && "read_instruction: x_indexed_indirect not implemented"); return 0;
+        case cpu::MODE_INDIRECT_Y_INDEXED: assert(0 && "read_instruction: indirect_y_indexed not implemented"); return 0;
+        case cpu::MODE_RELATIVE:           assert(0 && "read_instruction: relative not implemented"); return 0;
+        case cpu::MODE_ZEROPAGE:           assert(0 && "read_instruction: zeropage not implemented"); return 0;
+        case cpu::MODE_ZEROPAGE_X_INDEXED: assert(0 && "read_instruction: zeropage_x_indexed not implemented"); return 0;
+        case cpu::MODE_ZEROPAGE_Y_INDEXED: assert(0 && "read_instruction: zeropage_y_indexed not implemented"); return 0;
+        case cpu::MODE_UNUSED:             assert(0 && "read_instruction: unused not implemented"); return 0;
+    }
+
+    return 0;
+}
+
 cpu::instruction_meta cpu::get_instruction_meta(const cpu::instruction inst)
 {
     switch(inst.bits.cc)
@@ -209,9 +209,17 @@ cpu::instruction_meta cpu::get_instruction_meta(const cpu::instruction inst)
 
 cpu::instruction cpu::get_next_instruction()
 {
+    const uint8_t cc_bits  = 0x03;
+    const uint8_t bbb_bits = 0x07;
+    const uint8_t aaa_bits = 0x07;
+
     cpu::instruction inst = {};
     inst.code             = read_memory(pc);
+    inst.bits.cc          = inst.code & cc_bits;
+    inst.bits.bbb         = (inst.code >> 2) & bbb_bits;
+    inst.bits.aaa         = (inst.code >> 5) & aaa_bits;
     inst.address_mode     = get_address_mode(inst);
+
     return inst;
 }
 

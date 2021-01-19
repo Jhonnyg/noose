@@ -137,56 +137,23 @@ void noose::reset_rom(noose::rom* rom)
     memset(rom, 0, sizeof(*rom));
 }
 
-/*
-static void dbg_write_instruction_to_buffer(const cpu::instruction i, char* buffer, uint8_t op0, uint8_t op1)
+static uint8_t dbg_write_instruction_to_buffer(const noose::cpu::instruction i, char* buffer)
 {
-    switch(i.address_mode)
+    noose::cpu::instruction_meta meta = noose::cpu::get_instruction_meta(i);
+
+    switch (meta.type)
     {
-        case cpu::accumulator:
-            sprintf(buffer, "accumulator");
-            break;
-        case cpu::absolute:
-            sprintf(buffer, "absolute");
-            break;
-        case cpu::absolute_x_indexed:
-            sprintf(buffer, "absolute_x_indexed");
-            break;
-        case cpu::absolute_y_indexed:
-            sprintf(buffer, "absolute_y_indexed");
-            break;
-        case cpu::immediate:
-            sprintf(buffer, "immediate");
-            break;
-        case cpu::implied:
-            sprintf(buffer, "implied");
-            break;
-        case cpu::indirect:
-            sprintf(buffer, "indirect");
-            break;
-        case cpu::x_indexed_indirect:
-            sprintf(buffer, "x_indexed_indirect");
-            break;
-        case cpu::indirect_y_indexed:
-            sprintf(buffer, "indirect_y_indexed");
-            break;
-        case cpu::relative:
-            sprintf(buffer, "relative");
-            break;
-        case cpu::zeropage:
-            sprintf(buffer, "zeropage");
-            break;
-        case cpu::zeropage_x_indexed:
-            sprintf(buffer, "zeropage_x_indexed");
-            break;
-        case cpu::zeropage_y_indexed:
-            sprintf(buffer, "zeropage_y_indexed");
-            break;
-        case cpu::unused:
-            sprintf(buffer, "unused");
-            break;
+        // F5 C5  JMP $C5F5
+        case noose::cpu::FUNC_JMP:
+        {
+            int op0 = noose::cpu::read_address(i.address_mode, noose::cpu::pc + 1);
+            int op1 = noose::cpu::read_address(i.address_mode, noose::cpu::pc + 2);
+            return sprintf(buffer, "%02X %02X  %s $%02X%02X", op0, op1, meta.name, op1, op0);
+        }
     }
+
+    return 0;
 }
-*/
 
 bool noose::verify_rom(const noose::rom* rom, const char* verify_log_path)
 {
@@ -220,27 +187,34 @@ bool noose::verify_rom(const noose::rom* rom, const char* verify_log_path)
         uint8_t ppu_x = 0;
         uint8_t ppu_y = 0;
 
-        noose::cpu::execute(next);
-
-        // F5 C5  JMP $C5F5
-
         char instruction_str[40] = {};
+        dbg_write_instruction_to_buffer(next, instruction_str);
 
-        // dbg_write_instruction_to_buffer(next, buffer_noose, )
-
-        sprintf(buffer_noose, "%X  %X %s %s  %-32sA:%02X X:%02X Y:%02X P:%02X SP:%02X PPU:%3d,%3d CYC:%d\n",
-            pc, next.code, "o0", "o1", instruction_str, reg_a, reg_x, reg_y, p, sp, ppu_x, ppu_y, cycle_count);
+        noose::cpu::execute(next);
 
         #define COLOR_NRM  "\x1B[0m"
         #define COLOR_RED  "\x1B[31m"
         #define COLOR_GRN  "\x1B[32m"
+        #define COLOR_YEL  "\x1B[33m"
 
         uint16_t cursor = 0;
         const char* last_color = COLOR_NRM;
 
-        while(buffer_log[cursor] && cursor <= sizeof(buffer_log))
+        sprintf(buffer_noose, "%X  %X %-39sA:%02X X:%02X Y:%02X P:%02X SP:%02X PPU:%3d,%3d CYC:%d",
+            pc, next.code, instruction_str, reg_a, reg_x, reg_y, p, sp, ppu_x, ppu_y, cycle_count);
+
+        while(buffer_log[cursor] && cursor < strlen(buffer_noose))
         {
-            if (buffer_noose[cursor] == buffer_log[cursor])
+            if (cursor >= 74 && cursor < 86)
+            {
+                if (last_color != COLOR_YEL)
+                {
+                    printf("%s", COLOR_YEL);
+                    last_color = COLOR_YEL;
+                }
+                printf("%c", buffer_log[cursor]);
+            }
+            else if (buffer_noose[cursor] == buffer_log[cursor])
             {
                 if (last_color != COLOR_GRN)
                 {
@@ -269,13 +243,14 @@ bool noose::verify_rom(const noose::rom* rom, const char* verify_log_path)
 
         if (abort)
         {
-            add_error("Input string:");
+            add_error("Input string mismatch:");
             add_error(buffer_noose);
         }
 
         #undef COLOR_NRM
         #undef COLOR_RED
         #undef COLOR_GRN
+        #undef COLOR_YEL
 
         cycle_count += noose::cpu::get_instruction_meta(next).cycle_count;
     }
