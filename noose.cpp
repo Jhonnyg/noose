@@ -5,287 +5,7 @@
 
 #include "noose.h"
 
-static const uint32_t prg_block_size = 16384;
-static const uint32_t chr_block_size = 8192;
-
-namespace cpu
-{
-    enum func_type
-    {
-        NOP = 0x00,
-        JMP = 0x02,
-        LDX = 0x05,
-    };
-
-    enum address_mode
-    {
-        accumulator        = 0,
-        absolute           = 1,
-        absolute_x_indexed = 2,
-        absolute_y_indexed = 3,
-        immediate          = 4,
-        implied            = 5,
-        indirect           = 6,
-        x_indexed_indirect = 7,
-        indirect_y_indexed = 8,
-        relative           = 9,
-        zeropage           = 10,
-        zeropage_x_indexed = 11,
-        zeropage_y_indexed = 12,
-        unused             = 13
-    };
-
-    typedef void (*func_ptr)(uint8_t);
-    struct s_instruction_meta
-    {
-        const char* name;
-        func_type   type;
-        func_ptr    fn;
-        uint8_t     cycle_count;
-    };
-
-    struct s_instruction
-    {
-        s_instruction_meta meta;
-        address_mode       address_mode;
-        uint8_t            code;
-        uint8_t            cc;
-        uint8_t            bbb;
-        uint8_t            aaa;
-    };
-
-    typedef struct s_instruction_meta instruction_meta;
-    typedef struct s_instruction instruction;
-
-    static uint8_t  prg_rom[32767]; // $10000-$8000
-    static uint8_t  ram[2048];      // 2kb main RAM
-    static uint8_t  a;              // accumulator register
-    static uint8_t  x;              // index register x
-    static uint8_t  y;              // index register y
-    static uint8_t  p;              // cpu status flags
-    static uint8_t  sp;             // stack pointer
-    static uint16_t pc;             // program counter
-
-    static instruction instruction_current;
-    static uint8_t     instruction_data[2];
-
-    static uint8_t read_memory(uint16_t addr)
-    {
-        if (addr >= 0x8000)
-        {
-            return prg_rom[(addr - 0x8000) % 0x4000];
-        }
-
-        return 0;
-    }
-
-    static uint8_t read_instruction(address_mode mode, uint16_t op)
-    {
-        switch(mode)
-        {
-            case accumulator:        assert(0 && "read_instruction: accumulator not implemented"); return 0;
-            case absolute:           return read_memory(op);
-            case absolute_x_indexed: assert(0 && "read_instruction: absolute_x_indexed not implemented"); return 0;
-            case absolute_y_indexed: assert(0 && "read_instruction: absolute_y_indexed not implemented"); return 0;
-            case immediate:          return (uint8_t) op;
-            case implied:            assert(0 && "read_instruction: implied not implemented"); return 0;
-            case indirect:           assert(0 && "read_instruction: indirect not implemented"); return 0;
-            case x_indexed_indirect: assert(0 && "read_instruction: x_indexed_indirect not implemented"); return 0;
-            case indirect_y_indexed: assert(0 && "read_instruction: indirect_y_indexed not implemented"); return 0;
-            case relative:           assert(0 && "read_instruction: relative not implemented"); return 0;
-            case zeropage:           assert(0 && "read_instruction: zeropage not implemented"); return 0;
-            case zeropage_x_indexed: assert(0 && "read_instruction: zeropage_x_indexed not implemented"); return 0;
-            case zeropage_y_indexed: assert(0 && "read_instruction: zeropage_y_indexed not implemented"); return 0;
-            case unused:             assert(0 && "read_instruction: unused not implemented"); return 0;
-        }
-
-        return 0;
-    }
-
-    static uint16_t make_address(uint8_t hi, uint8_t lo)
-    {
-        return ((uint16_t) hi << 8) | lo;
-    }
-
-    static void func_fn_nop(uint8_t cycle)
-    {
-        // NOP
-    }
-
-    static void func_fn_jmp(uint8_t cycle)
-    {
-        assert(instruction_current.meta.type == JMP);
-        switch(cycle)
-        {
-            case 0:
-                pc += 0x01;
-                break;
-            case 1:
-                instruction_data[0] = read_instruction(instruction_current.address_mode, pc);
-                pc += 0x01;
-                break;
-            case 2:
-                instruction_data[1] = read_instruction(instruction_current.address_mode, pc);
-                pc                  = make_address(instruction_data[1], instruction_data[0]);
-                break;
-        }
-    }
-
-    static void func_fn_ldx(uint8_t cycle)
-    {
-        /*
-        #  address R/W description
-       --- ------- --- ------------------------------------------
-        1    PC     R  fetch opcode, increment PC
-        2    PC     R  fetch low byte of address, increment PC
-        3    PC     R  fetch high byte of address, increment PC
-        4  address  R  read from effective address
-        */
-        switch(cycle)
-        {
-            case 0:
-                pc += 0x01;
-                break;
-            case 1:
-                instruction_data[0] = read_instruction(instruction_current.address_mode, pc);
-                pc += 0x01;
-                break;
-            case 2:
-                instruction_data[1] = read_instruction(instruction_current.address_mode, pc);
-                pc += 0x01;
-                break;
-            case 3:
-                x = read_instruction(instruction_current.address_mode, make_address(instruction_data[1], instruction_data[0]));
-                break;
-        }
-    }
-
-    static instruction_meta instruction_meta_table[] = {
-        { "NOP",     NOP, func_fn_nop, 0 },
-        { "BIT",     NOP, func_fn_nop, 0 },
-        { "JMP",     JMP, func_fn_jmp, 3 },
-        { "JMP_ABS", NOP, func_fn_nop, 3 },
-        { "STY",     NOP, func_fn_nop, 3 },
-        { "LDY",     NOP, func_fn_nop, 3 },
-        { "CPY",     NOP, func_fn_nop, 3 },
-        { "CPX",     NOP, func_fn_nop, 3 },
-        // 01
-        { "ORA",     NOP, func_fn_nop, 3 },
-        { "AND",     NOP, func_fn_nop, 3 },
-        { "EOR",     NOP, func_fn_nop, 3 },
-        { "ADC",     NOP, func_fn_nop, 3 },
-        { "STA",     NOP, func_fn_nop, 3 },
-        { "LDA",     NOP, func_fn_nop, 3 },
-        { "CMP",     NOP, func_fn_nop, 3 },
-        { "SBC",     NOP, func_fn_nop, 3 },
-        // 10
-        { "ASL",     NOP, func_fn_nop, 3 },
-        { "ROL",     NOP, func_fn_nop, 3 },
-        { "LSR",     NOP, func_fn_nop, 3 },
-        { "ROR",     NOP, func_fn_nop, 3 },
-        { "STX",     NOP, func_fn_nop, 3 },
-        { "LDX",     LDX, func_fn_ldx, 3 },
-        { "DEC",     NOP, func_fn_nop, 3 },
-        { "INC",     NOP, func_fn_nop, 3 },
-    };
-
-    static void initialize()
-    {
-        memset(ram, 0, sizeof(ram));
-        memset(prg_rom, 0, sizeof(prg_rom));
-        a  = 0;
-        x  = 0;
-        y  = 0;
-        p  = 34;
-        sp = 0xFD;
-        pc = 0;
-    }
-
-    static address_mode get_address_mode(const instruction inst)
-    {
-        const address_mode addr_mode_lut[] = {
-            // CC 00
-            immediate,
-            zeropage,
-            unused,
-            absolute,
-            unused,
-            zeropage_x_indexed,
-            unused,
-            absolute_x_indexed,
-
-            // CC 01
-            x_indexed_indirect,
-            zeropage,
-            immediate,
-            absolute,
-            indirect_y_indexed,
-            zeropage_x_indexed,
-            absolute_y_indexed,
-            absolute_x_indexed,
-
-            // CC 10
-            immediate,
-            zeropage,
-            accumulator,
-            absolute,
-            unused,
-            zeropage_x_indexed,
-            unused,
-            absolute_x_indexed
-        };
-
-        switch(inst.cc)
-        {
-            case 0: return addr_mode_lut[inst.bbb];
-            case 1: return addr_mode_lut[inst.bbb + 8];
-            case 2: return addr_mode_lut[inst.bbb + 16];
-        }
-
-        return unused;
-    }
-
-    static instruction get_next_instruction()
-    {
-        const uint8_t cc_bits  = 0x03;
-        const uint8_t bbb_bits = 0x07;
-        const uint8_t aaa_bits = 0x07;
-        instruction inst;
-        memset(&inst, 0, sizeof(inst));
-        inst.code         = read_memory(pc);
-        inst.cc           = inst.code & cc_bits;
-        inst.bbb          = (inst.code >> 2) & bbb_bits;
-        inst.aaa          = (inst.code >> 5) & aaa_bits;
-        inst.address_mode = get_address_mode(inst);
-
-        switch(inst.cc)
-        {
-            case 0:
-                inst.meta = instruction_meta_table[inst.aaa];
-                break;
-            case 1:
-                inst.meta = instruction_meta_table[inst.aaa + 8];
-                break;
-            case 2:
-                inst.meta = instruction_meta_table[inst.aaa + 16];
-                break;
-        }
-
-        return inst;
-    }
-
-    static void execute(instruction inst)
-    {
-        instruction_current = inst;
-        uint8_t cycle       = 0;
-        while(cycle < instruction_current.meta.cycle_count)
-        {
-            instruction_current.meta.fn(cycle);
-            // ppu::step(3);
-            cycle++;
-        }
-    }
-}
+#include "noose_internal.h"
 
 static struct s_pgm_error
 {
@@ -382,7 +102,7 @@ bool noose::load_rom(const char* path, noose::rom* output)
 
     if (output->header.page_count_prg > 0)
     {
-        uint32_t bytes_to_alloc = prg_block_size * output->header.page_count_prg;
+        uint32_t bytes_to_alloc = output->header.page_count_prg * BLOCK_SIZE_PRG;
         output->data_prg = (uint8_t*) malloc(bytes_to_alloc);
         memcpy(output->data_prg, &buffer[cursor], bytes_to_alloc);
         cursor += bytes_to_alloc;
@@ -390,7 +110,7 @@ bool noose::load_rom(const char* path, noose::rom* output)
 
     if (output->header.page_count_chr > 0)
     {
-        uint32_t bytes_to_alloc = output->header.page_count_chr * chr_block_size;
+        uint32_t bytes_to_alloc = output->header.page_count_chr * BLOCK_SIZE_CHR;
         output->data_chr = (uint8_t*) malloc(bytes_to_alloc);
         memcpy(output->data_chr, &buffer[cursor], bytes_to_alloc);
     }
@@ -417,62 +137,64 @@ void noose::reset_rom(noose::rom* rom)
     memset(rom, 0, sizeof(*rom));
 }
 
-static void dbg_write_instruction_to_buffer(const instruction i, char* buffer, uint8_t op0, uint8_t op1)
+/*
+static void dbg_write_instruction_to_buffer(const cpu::instruction i, char* buffer, uint8_t op0, uint8_t op1)
 {
     switch(i.address_mode)
     {
-        case accumulator:
+        case cpu::accumulator:
             sprintf(buffer, "accumulator");
             break;
-        case absolute:
+        case cpu::absolute:
             sprintf(buffer, "absolute");
             break;
-        case absolute_x_indexed:
+        case cpu::absolute_x_indexed:
             sprintf(buffer, "absolute_x_indexed");
             break;
-        case absolute_y_indexed:
+        case cpu::absolute_y_indexed:
             sprintf(buffer, "absolute_y_indexed");
             break;
-        case immediate:
+        case cpu::immediate:
             sprintf(buffer, "immediate");
             break;
-        case implied:
+        case cpu::implied:
             sprintf(buffer, "implied");
             break;
-        case indirect:
+        case cpu::indirect:
             sprintf(buffer, "indirect");
             break;
-        case x_indexed_indirect:
+        case cpu::x_indexed_indirect:
             sprintf(buffer, "x_indexed_indirect");
             break;
-        case indirect_y_indexed:
+        case cpu::indirect_y_indexed:
             sprintf(buffer, "indirect_y_indexed");
             break;
-        case relative:
+        case cpu::relative:
             sprintf(buffer, "relative");
             break;
-        case zeropage:
+        case cpu::zeropage:
             sprintf(buffer, "zeropage");
             break;
-        case zeropage_x_indexed:
+        case cpu::zeropage_x_indexed:
             sprintf(buffer, "zeropage_x_indexed");
             break;
-        case zeropage_y_indexed:
+        case cpu::zeropage_y_indexed:
             sprintf(buffer, "zeropage_y_indexed");
             break;
-        case unused:
+        case cpu::unused:
             sprintf(buffer, "unused");
             break;
     }
 }
+*/
 
 bool noose::verify_rom(const noose::rom* rom, const char* verify_log_path)
 {
-    cpu::initialize();
+    noose::cpu::initialize(rom);
 
     // Start up state
-    cpu::p  = 0x24; // Should be 34, but not for nestest apparently..
-    cpu::pc = 0xC000;
+    noose::cpu::p  = 0x24; // Should be 34, but not for nestest apparently..
+    noose::cpu::pc = 0xC000;
 
     FILE* f = fopen(verify_log_path, "r");
     if (f == NULL)
@@ -481,18 +203,13 @@ bool noose::verify_rom(const noose::rom* rom, const char* verify_log_path)
         return false;
     }
 
-    memcpy(cpu::prg_rom, rom->data_prg, rom->header.page_count_prg * prg_block_size);
-
     uint32_t cycle_count = 7;
-
-    printf("PC: %x\n", cpu::pc);
-
     bool abort = false;
     char buffer_log[256];
     char buffer_noose[256];
     while(fgets(buffer_log, sizeof(buffer_log), f) != NULL && !abort)
     {
-        cpu::instruction next = cpu::get_next_instruction();
+        noose::cpu::instruction next = noose::cpu::get_next_instruction();
 
         uint16_t pc   = cpu::pc;
         uint8_t reg_a = cpu::a;
@@ -503,34 +220,16 @@ bool noose::verify_rom(const noose::rom* rom, const char* verify_log_path)
         uint8_t ppu_x = 0;
         uint8_t ppu_y = 0;
 
-        cpu::execute(next);
+        noose::cpu::execute(next);
 
-        /*
-        char op0[3] = "  ";
-        char op1[3] = "  ";
-        char instruction_str[32];
-
-        sprintf(instruction_str, "%s", next.meta.name);
-
-        if (next.meta.operand_count > 0)
-        {
-            sprintf(op0, "%X", cpu::read_memory(pc + 1));
-        }
-
-        if (next.meta.operand_count > 1)
-        {
-            sprintf(op1, "%X", cpu::read_memory(pc + 2));
-        }
-        */
-
-        F5 C5  JMP $C5F5
+        // F5 C5  JMP $C5F5
 
         char instruction_str[40] = {};
 
-        dbg_write_instruction_to_buffer(next, buffer_noose, )
+        // dbg_write_instruction_to_buffer(next, buffer_noose, )
 
         sprintf(buffer_noose, "%X  %X %s %s  %-32sA:%02X X:%02X Y:%02X P:%02X SP:%02X PPU:%3d,%3d CYC:%d\n",
-            pc, next.code, op0, op1, instruction_str, reg_a, reg_x, reg_y, p, sp, ppu_x, ppu_y, cycle_count);
+            pc, next.code, "o0", "o1", instruction_str, reg_a, reg_x, reg_y, p, sp, ppu_x, ppu_y, cycle_count);
 
         #define COLOR_NRM  "\x1B[0m"
         #define COLOR_RED  "\x1B[31m"
@@ -578,7 +277,7 @@ bool noose::verify_rom(const noose::rom* rom, const char* verify_log_path)
         #undef COLOR_RED
         #undef COLOR_GRN
 
-        cycle_count += next.meta.cycle_count;
+        cycle_count += noose::cpu::get_instruction_meta(next).cycle_count;
     }
 
     fclose(f);

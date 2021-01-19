@@ -1,6 +1,7 @@
 #ifndef __NOOSE_H__
 #define __NOOSE_H__
 
+// This header is for the front facing API
 namespace noose
 {
     /*
@@ -54,16 +55,15 @@ namespace noose
     typedef struct s_rom    rom;
     typedef struct s_header header;
 
-    bool load_rom(const char* path, rom* output);
-    void reset_rom(noose::rom* rom);
-    bool verify_rom(const noose::rom* rom, const char* verify_log_path);
-    void debug(const char* debug_str);
-    void error(const char* error_str);
-    void print_help();
-    void print_header(const header h);
-
+    bool        load_rom(const char* path, rom* output);
+    void        reset_rom(noose::rom* rom);
+    bool        verify_rom(const noose::rom* rom, const char* verify_log_path);
+    void        debug(const char* debug_str);
+    void        error(const char* error_str);
+    void        print_help();
+    void        print_header(const header h);
     const char* last_error();
-    bool has_errors();
+    bool        has_errors();
 }
 
 #endif /* __NOOSE_H__ */
