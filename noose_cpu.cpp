@@ -97,16 +97,16 @@ static address_mode_lut_entry address_mode_lut[] =
         action_list_out[action_index++] = cpu::action(ac); \
     }
 
-#define ADD_ACTION_WRITE(type, a, t) \
+#define ADD_ACTION_WRITE(type, f, a) \
     { \
-        cpu::action::write_##type ac    = { .from = a, .to = t }; \
+        cpu::action::write_##type ac    = { .from = f, .address = a }; \
         action_list_out[action_index++] = cpu::action(ac); \
     }
 
 #define ADD_ACTION_COPY_SHORT(f, t, b) (ADD_ACTION_COPY(short, f, t, b))
 #define ADD_ACTION_COPY_BYTE(f, t, b)  (ADD_ACTION_COPY(byte, f, t, b))
 #define ADD_ACTION_READ_BYTE(a, t, b)  (ADD_ACTION_READ(byte, a, t, b))
-#define ADD_ACTION_WRITE_BYTE(a, t)    (ADD_ACTION_WRITE(byte, a, t))
+#define ADD_ACTION_WRITE_BYTE(f, a)    (ADD_ACTION_WRITE(byte, f, a))
 
 static uint8_t fill_action_list_read(cpu::address_mode mode, cpu::action_address dst, cpu::action* action_list_out)
 {
@@ -130,7 +130,7 @@ static uint8_t fill_action_list_read(cpu::address_mode mode, cpu::action_address
     return action_index;
 }
 
-static uint8_t fill_action_list_write(cpu::address_mode mode, cpu::action_address dst, cpu::action* action_list_out)
+static uint8_t fill_action_list_write(cpu::address_mode mode, cpu::action_address from, cpu::action* action_list_out)
 {
     uint8_t action_index = 0;
     switch(mode)
@@ -138,7 +138,7 @@ static uint8_t fill_action_list_write(cpu::address_mode mode, cpu::action_addres
         case cpu::MODE_ZEROPAGE:
         {
             ADD_ACTION_COPY_BYTE(cpu::ADDRESS_PC_PTR_ADVANCE, cpu::ADDRESS_TEMP_LO, cpu::COPY_NONE);
-            ADD_ACTION_WRITE_BYTE(cpu::ADDRESS_TEMP_LO, dst);
+            ADD_ACTION_WRITE_BYTE(from, cpu::ADDRESS_TEMP_LO);
         } break;
     }
     return action_index;
@@ -240,6 +240,23 @@ static void do_action(const cpu::action action)
             }
 
         } break;
+        case cpu::ID_WRITE_BYTE:
+        {
+            uint8_t data = 0x0;
+            switch(action.write_byte_data.from)
+            {
+                case cpu::ADDRESS_X:
+                    data = cpu::x;
+                    break;
+            }
+
+            switch(action.write_byte_data.address)
+            {
+                case cpu::ADDRESS_TEMP_LO:
+                    cpu::write_memory((uint16_t) address_temp & 0xf, data);
+                    break;
+            }
+        } break;
         case cpu::ID_COPY_BYTE:
         {
             uint8_t data = 0x0;
@@ -259,6 +276,9 @@ static void do_action(const cpu::action action)
             {
                 case cpu::ADDRESS_X:
                     cpu::x = data;
+                    break;
+                case cpu::ADDRESS_TEMP_LO:
+                    address_temp = (address_temp & 0xf0) + (uint16_t) data;
                     break;
             }
 
@@ -294,6 +314,11 @@ uint8_t cpu::read_memory(uint16_t addr)
     }
 
     return 0;
+}
+
+void cpu::write_memory(uint16_t addr, uint8_t data)
+{
+    cpu::prg_rom[addr] = data;
 }
 
 cpu::address_mode cpu::get_address_mode(const cpu::instruction inst)

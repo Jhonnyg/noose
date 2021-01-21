@@ -110,7 +110,7 @@ namespace noose
             struct write_byte
             {
                 action_address from;
-                action_address to;
+                action_address address;
             };
 
             union
@@ -167,6 +167,7 @@ namespace noose
         address_mode     get_address_mode(const cpu::instruction inst);
         const char*      get_address_mode_str(const cpu::instruction inst);
         uint8_t          read_memory(uint16_t addr);
+        void             write_memory(uint16_t addr, uint8_t data);
         void             execute(const instruction inst);
     }
 }
