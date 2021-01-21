@@ -143,16 +143,43 @@ static uint8_t dbg_write_instruction_to_buffer(const noose::cpu::instruction i, 
 
     switch (meta.type)
     {
-        // F5 C5  JMP $C5F5
         case noose::cpu::FUNC_JMP:
         {
-            int op0 = noose::cpu::read_address(i.address_mode, noose::cpu::pc + 1);
-            int op1 = noose::cpu::read_address(i.address_mode, noose::cpu::pc + 2);
+            int op0 = noose::cpu::read_memory(noose::cpu::pc + 1);
+            int op1 = noose::cpu::read_memory(noose::cpu::pc + 2);
             return sprintf(buffer, "%02X %02X  %s $%02X%02X", op0, op1, meta.name, op1, op0);
+        }
+        case noose::cpu::FUNC_LDX:
+        {
+            int op0 = noose::cpu::read_memory(noose::cpu::pc + 1);
+            if (noose::cpu::get_address_mode(i) == noose::cpu::MODE_IMMEDIATE)
+            {
+                return sprintf(buffer, "%02X     %s #$%02X", op0, meta.name, op0);
+            }
+            else
+            {
+                int op1 = noose::cpu::read_memory(noose::cpu::pc + 2);
+                return sprintf(buffer, "%02X %02X  %s $%02X%02X", op0, op1, meta.name, op1, op0);
+            }
+        }
+        case noose::cpu::FUNC_STX:
+        {
+            int op0 = noose::cpu::read_memory(noose::cpu::pc + 1);
+            if (noose::cpu::get_address_mode(i) == noose::cpu::MODE_ZEROPAGE)
+            {
+                return sprintf(buffer, "%02X     %s $%02X = %02X", op0, meta.name, op0, noose::cpu::x);
+            }
+            //STX $00 = 00
         }
     }
 
     return 0;
+}
+
+static void print_debug_instruction(const noose::cpu::instruction inst)
+{
+    noose::cpu::instruction_meta meta = noose::cpu::get_instruction_meta(inst);
+    printf("Instruction, Address Mode, Cycle count: %s, %s, %d\n", meta.name, get_address_mode_str(inst), inst.cycle_count);
 }
 
 bool noose::verify_rom(const noose::rom* rom, const char* verify_log_path)
@@ -192,6 +219,8 @@ bool noose::verify_rom(const noose::rom* rom, const char* verify_log_path)
 
         noose::cpu::execute(next);
 
+        print_debug_instruction(next);
+
         #define COLOR_NRM  "\x1B[0m"
         #define COLOR_RED  "\x1B[31m"
         #define COLOR_GRN  "\x1B[32m"
@@ -200,7 +229,7 @@ bool noose::verify_rom(const noose::rom* rom, const char* verify_log_path)
         uint16_t cursor = 0;
         const char* last_color = COLOR_NRM;
 
-        sprintf(buffer_noose, "%X  %X %-39sA:%02X X:%02X Y:%02X P:%02X SP:%02X PPU:%3d,%3d CYC:%d",
+        sprintf(buffer_noose, "%04X  %02X %-39sA:%02X X:%02X Y:%02X P:%02X SP:%02X PPU:%3d,%3d CYC:%d",
             pc, next.code, instruction_str, reg_a, reg_x, reg_y, p, sp, ppu_x, ppu_y, cycle_count);
 
         while(buffer_log[cursor] && cursor < strlen(buffer_noose))
@@ -252,7 +281,7 @@ bool noose::verify_rom(const noose::rom* rom, const char* verify_log_path)
         #undef COLOR_GRN
         #undef COLOR_YEL
 
-        cycle_count += noose::cpu::get_instruction_meta(next).cycle_count;
+        cycle_count += next.cycle_count;
     }
 
     fclose(f);

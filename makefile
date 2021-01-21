@@ -1,6 +1,6 @@
 
 CC = clang++
-CFLAGS = -g -Wall -o0
+CFLAGS = -g -Wall -o0 -Wno-switch
 OUT = bin
 BIN = $(OUT)/noose
 

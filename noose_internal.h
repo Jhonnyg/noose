@@ -33,31 +33,53 @@ namespace noose
             FUNC_NOP = 0,
             FUNC_JMP = 1,
             FUNC_LDX = 2,
+            FUNC_STX = 3,
         };
 
         enum action_address
         {
+            ADDRESS_NONE,
             ADDRESS_A,
             ADDRESS_X,
             ADDRESS_Y,
-            ADDRESS_PC_HI,
-            ADDRESS_PC_LO,
             ADDRESS_PC,
-            ADDRESS_TEMP
+            ADDRESS_PC_ADVANCE,
+            ADDRESS_PC_PTR,
+            ADDRESS_PC_PTR_ADVANCE,
+            ADDRESS_TEMP,
+            ADDRESS_TEMP_LO,
+            ADDRESS_TEMP_HI,
         };
+
+        /*
+        enum action_address_short
+        {
+            ADDRESS_SHORT_NONE,
+            ADDRESS_SHORT_PC,
+            ADDRESS_SHORT_PC_PTR,
+            ADDRESS_SHORT_PC_PTR_ADVANCE,
+            ADDRESS_SHORT_TEMP,
+        };
+        */
 
         enum action_id
         {
             ID_NOP,
             ID_INCREMENT_PC,
             ID_COPY_BYTE,
+            ID_COPY_SHORT,
+            ID_READ_BYTE,
+            ID_WRITE_BYTE,
         };
 
         enum action_copy_behaviour
         {
             COPY_NONE,
-            COPY_INCREMENT_PC,
-            COPY_SET_PC,
+        };
+
+        enum action_read_behaviour
+        {
+            READ_NONE,
         };
 
         struct action
@@ -71,20 +93,48 @@ namespace noose
                 action_copy_behaviour copy_behaviour;
             };
 
-            union
+            struct copy_short
             {
-                struct copy_byte copy_byte_data;
+                action_address        from;
+                action_address        to;
+                action_copy_behaviour copy_behaviour;
             };
 
-            action()               : id(ID_NOP) {}
-            action(action_id id)   : id(id) {}
-            action(copy_byte data) : id(ID_COPY_BYTE), copy_byte_data(data) {}
+            struct read_byte
+            {
+                action_address        address;
+                action_address        to;
+                action_read_behaviour read_behaviour;
+            };
+
+            struct write_byte
+            {
+                action_address from;
+                action_address to;
+            };
+
+            union
+            {
+                struct copy_byte  copy_byte_data;
+                struct copy_short copy_short_data;
+                struct read_byte  read_byte_data;
+                struct write_byte write_byte_data;
+            };
+
+            action()                : id(ID_NOP) {}
+            action(action_id id)    : id(id) {}
+            action(copy_byte data)  : id(ID_COPY_BYTE),  copy_byte_data(data)  {}
+            action(copy_short data) : id(ID_COPY_SHORT), copy_short_data(data) {}
+            action(read_byte data)  : id(ID_READ_BYTE),  read_byte_data(data)  {}
+            action(write_byte data) : id(ID_WRITE_BYTE), write_byte_data(data) {}
         };
 
         struct s_instruction
         {
             address_mode address_mode;
-            uint8_t code;
+            action       cycles[16];
+            uint8_t      cycle_count;
+            uint8_t      code;
             struct
             {
                 uint8_t aaa : 3;
@@ -97,7 +147,6 @@ namespace noose
         {
             const char* name;
             func_type   type;
-            uint8_t     cycle_count;
         };
 
         typedef struct s_instruction_meta instruction_meta;
@@ -115,7 +164,9 @@ namespace noose
         void             initialize(const noose::rom* rom);
         instruction      get_next_instruction();
         instruction_meta get_instruction_meta(const instruction inst);
-        uint8_t          read_address(cpu::address_mode mode, uint16_t op);
+        address_mode     get_address_mode(const cpu::instruction inst);
+        const char*      get_address_mode_str(const cpu::instruction inst);
+        uint8_t          read_memory(uint16_t addr);
         void             execute(const instruction inst);
     }
 }

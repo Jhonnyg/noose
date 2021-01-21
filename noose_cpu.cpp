@@ -16,145 +16,255 @@ uint8_t  cpu::sp;
 uint16_t cpu::pc;
 
 // Extra address locations
-static uint8_t address_temp;
+static uint16_t address_temp;
 
 static cpu::instruction_meta instruction_meta_table[] = {
-    { "NOP",     cpu::FUNC_NOP, 0 },
-    { "BIT",     cpu::FUNC_NOP, 0 },
-    { "JMP",     cpu::FUNC_JMP, 3 },
-    { "JMP_ABS", cpu::FUNC_NOP, 0 },
-    { "STY",     cpu::FUNC_NOP, 0 },
-    { "LDY",     cpu::FUNC_NOP, 0 },
-    { "CPY",     cpu::FUNC_NOP, 0 },
-    { "CPX",     cpu::FUNC_NOP, 0 },
+    { "NOP",     cpu::FUNC_NOP },
+    { "BIT",     cpu::FUNC_NOP },
+    { "JMP",     cpu::FUNC_JMP },
+    { "JMP_ABS", cpu::FUNC_NOP },
+    { "STY",     cpu::FUNC_NOP },
+    { "LDY",     cpu::FUNC_NOP },
+    { "CPY",     cpu::FUNC_NOP },
+    { "CPX",     cpu::FUNC_NOP },
     // 01
-    { "ORA",     cpu::FUNC_NOP, 0 },
-    { "AND",     cpu::FUNC_NOP, 0 },
-    { "EOR",     cpu::FUNC_NOP, 0 },
-    { "ADC",     cpu::FUNC_NOP, 0 },
-    { "STA",     cpu::FUNC_NOP, 0 },
-    { "LDA",     cpu::FUNC_NOP, 0 },
-    { "CMP",     cpu::FUNC_NOP, 0 },
-    { "SBC",     cpu::FUNC_NOP, 0 },
+    { "ORA",     cpu::FUNC_NOP },
+    { "AND",     cpu::FUNC_NOP },
+    { "EOR",     cpu::FUNC_NOP },
+    { "ADC",     cpu::FUNC_NOP },
+    { "STA",     cpu::FUNC_NOP },
+    { "LDA",     cpu::FUNC_NOP },
+    { "CMP",     cpu::FUNC_NOP },
+    { "SBC",     cpu::FUNC_NOP },
     // 10
-    { "ASL",     cpu::FUNC_NOP, 0 },
-    { "ROL",     cpu::FUNC_NOP, 0 },
-    { "LSR",     cpu::FUNC_NOP, 0 },
-    { "ROR",     cpu::FUNC_NOP, 0 },
-    { "STX",     cpu::FUNC_NOP, 0 },
-    { "LDX",     cpu::FUNC_LDX, 4 },
-    { "DEC",     cpu::FUNC_NOP, 0 },
-    { "INC",     cpu::FUNC_NOP, 0 },
+    { "ASL",     cpu::FUNC_NOP },
+    { "ROL",     cpu::FUNC_NOP },
+    { "LSR",     cpu::FUNC_NOP },
+    { "ROR",     cpu::FUNC_NOP },
+    { "STX",     cpu::FUNC_STX },
+    { "LDX",     cpu::FUNC_LDX },
+    { "DEC",     cpu::FUNC_NOP },
+    { "INC",     cpu::FUNC_NOP },
 };
 
-static cpu::address_mode get_address_mode(const cpu::instruction inst)
+struct address_mode_lut_entry
 {
-    const cpu::address_mode addr_mode_lut[] = {
-        // CC 00
-        cpu::MODE_IMMEDIATE,
-        cpu::MODE_ZEROPAGE,
-        cpu::MODE_UNUSED,
-        cpu::MODE_ABSOLUTE,
-        cpu::MODE_UNUSED,
-        cpu::MODE_ZEROPAGE_X_INDEXED,
-        cpu::MODE_UNUSED,
-        cpu::MODE_ABSOLUTE_X_INDEXED,
+    cpu::address_mode mode;
+    const char*       mode_str;
+};
 
-        // CC 01
-        cpu::MODE_X_INDEXED_INDIRECT,
-        cpu::MODE_ZEROPAGE,
-        cpu::MODE_IMMEDIATE,
-        cpu::MODE_ABSOLUTE,
-        cpu::MODE_INDIRECT_Y_INDEXED,
-        cpu::MODE_ZEROPAGE_X_INDEXED,
-        cpu::MODE_ABSOLUTE_X_INDEXED,
-        cpu::MODE_ABSOLUTE_X_INDEXED,
+static address_mode_lut_entry address_mode_lut[] =
+{
+    {cpu::MODE_IMMEDIATE,          "MODE_IMMEDIATE" },
+    {cpu::MODE_ZEROPAGE,           "MODE_ZEROPAGE" },
+    {cpu::MODE_UNUSED,             "MODE_UNUSED" },
+    {cpu::MODE_ABSOLUTE,           "MODE_ABSOLUTE" },
+    {cpu::MODE_UNUSED,             "MODE_UNUSED" },
+    {cpu::MODE_ZEROPAGE_X_INDEXED, "MODE_ZEROPAGE_X_INDEXED" },
+    {cpu::MODE_UNUSED,             "MODE_UNUSED" },
+    {cpu::MODE_ABSOLUTE_X_INDEXED, "MODE_ABSOLUTE_X_INDEXED" },
 
-        // CC 10
-        cpu::MODE_IMMEDIATE,
-        cpu::MODE_ZEROPAGE,
-        cpu::MODE_ACCUMULATOR,
-        cpu::MODE_ABSOLUTE,
-        cpu::MODE_UNUSED,
-        cpu::MODE_ZEROPAGE_X_INDEXED,
-        cpu::MODE_UNUSED,
-        cpu::MODE_ABSOLUTE_X_INDEXED
-    };
+    // CC 01
+    {cpu::MODE_X_INDEXED_INDIRECT, "MODE_X_INDEXED_INDIRECT"},
+    {cpu::MODE_ZEROPAGE,           "MODE_ZEROPAGE"},
+    {cpu::MODE_IMMEDIATE,          "MODE_IMMEDIATE"},
+    {cpu::MODE_ABSOLUTE,           "MODE_ABSOLUTE"},
+    {cpu::MODE_INDIRECT_Y_INDEXED, "MODE_INDIRECT_Y_INDEXED"},
+    {cpu::MODE_ZEROPAGE_X_INDEXED, "MODE_ZEROPAGE_X_INDEXED"},
+    {cpu::MODE_ABSOLUTE_X_INDEXED, "MODE_ABSOLUTE_X_INDEXED"},
+    {cpu::MODE_ABSOLUTE_X_INDEXED, "MODE_ABSOLUTE_X_INDEXED"},
 
-    switch(inst.bits.cc)
-    {
-        case 0: return addr_mode_lut[inst.bits.bbb];
-        case 1: return addr_mode_lut[inst.bits.bbb + 8];
-        case 2: return addr_mode_lut[inst.bits.bbb + 16];
+    // CC 10
+    {cpu::MODE_IMMEDIATE,          "MODE_IMMEDIATE"},
+    {cpu::MODE_ZEROPAGE,           "MODE_ZEROPAGE"},
+    {cpu::MODE_ACCUMULATOR,        "MODE_ACCUMULATOR"},
+    {cpu::MODE_ABSOLUTE,           "MODE_ABSOLUTE"},
+    {cpu::MODE_UNUSED,             "MODE_UNUSED"},
+    {cpu::MODE_ZEROPAGE_X_INDEXED, "MODE_ZEROPAGE_X_INDEXED"},
+    {cpu::MODE_UNUSED,             "MODE_UNUSED"},
+    {cpu::MODE_ABSOLUTE_X_INDEXED, "MODE_ABSOLUTE_X_INDEXED"},
+};
+
+#define ADD_ACTION_COPY(type, f, t, b) \
+    { \
+        cpu::action::copy_##type ac = { .from = f, .to = t, .copy_behaviour = b }; \
+        action_list_out[action_index++] = cpu::action(ac); \
     }
 
-    return cpu::MODE_UNUSED;
-}
-
-static uint8_t read_memory(uint16_t addr)
-{
-    if (addr >= 0x8000)
-    {
-        return cpu::prg_rom[(addr - 0x8000) % 0x4000];
+#define ADD_ACTION_READ(type, a, t, b) \
+    { \
+        cpu::action::read_##type ac = { .address = a, .to = t, .read_behaviour = b }; \
+        action_list_out[action_index++] = cpu::action(ac); \
     }
 
-    return 0;
-}
+#define ADD_ACTION_WRITE(type, a, t) \
+    { \
+        cpu::action::write_##type ac    = { .from = a, .to = t }; \
+        action_list_out[action_index++] = cpu::action(ac); \
+    }
 
-static void fill_action_list(const cpu::instruction_meta meta, cpu::action* action_list_out)
+#define ADD_ACTION_COPY_SHORT(f, t, b) (ADD_ACTION_COPY(short, f, t, b))
+#define ADD_ACTION_COPY_BYTE(f, t, b)  (ADD_ACTION_COPY(byte, f, t, b))
+#define ADD_ACTION_READ_BYTE(a, t, b)  (ADD_ACTION_READ(byte, a, t, b))
+#define ADD_ACTION_WRITE_BYTE(a, t)    (ADD_ACTION_WRITE(byte, a, t))
+
+static uint8_t fill_action_list_read(cpu::address_mode mode, cpu::action_address dst, cpu::action* action_list_out)
 {
-    switch(meta.type)
+    uint8_t action_index = 0;
+    switch(mode)
     {
-        case cpu::FUNC_JMP:
+        case cpu::MODE_ABSOLUTE:
         {
-            cpu::action::copy_byte ac0 = { .from = cpu::ADDRESS_PC,   .to = cpu::ADDRESS_TEMP,  .copy_behaviour = cpu::COPY_INCREMENT_PC };
-            cpu::action::copy_byte ac1 = { .from = cpu::ADDRESS_TEMP, .to = cpu::ADDRESS_PC_LO, .copy_behaviour = cpu::COPY_SET_PC};
-            action_list_out[0]         = cpu::action(ac0);
-            action_list_out[1]         = cpu::action(ac1);
+            /*
+            ADD_ACTION_COPY_BYTE(cpu::ADDRESS_PC_PTR_ADVANCE, cpu::ADDRESS_TEMP_LO, cpu::COPY_NONE);
+            ADD_ACTION_COPY_BYTE(cpu::ADDRESS_PC_PTR_ADVANCE, cpu::ADDRESS_TEMP_HI, cpu::COPY_NONE);
+            ADD_ACTION_READ_BYTE(cpu::ADDRESS_TEMP, cpu::ADDRESS_X, cpu::READ_NONE);
+            */
+        } break;
+        case cpu::MODE_IMMEDIATE:
+        {
+            ADD_ACTION_COPY_BYTE(cpu::ADDRESS_PC_PTR_ADVANCE, dst, cpu::COPY_NONE);
         } break;
     }
+
+    return action_index;
 }
 
-static void do_action(const cpu::action action, cpu::address_mode mode)
+static uint8_t fill_action_list_write(cpu::address_mode mode, cpu::action_address dst, cpu::action* action_list_out)
+{
+    uint8_t action_index = 0;
+    switch(mode)
+    {
+        case cpu::MODE_ZEROPAGE:
+        {
+            ADD_ACTION_COPY_BYTE(cpu::ADDRESS_PC_PTR_ADVANCE, cpu::ADDRESS_TEMP_LO, cpu::COPY_NONE);
+            ADD_ACTION_WRITE_BYTE(cpu::ADDRESS_TEMP_LO, dst);
+        } break;
+    }
+    return action_index;
+}
+
+static uint8_t fill_action_list(const cpu::instruction_meta meta, cpu::address_mode mode, cpu::action* action_list_out)
+{
+    uint8_t action_index = 0;
+
+    switch(meta.type)
+    {
+        case cpu::FUNC_NOP:
+            break;
+        case cpu::FUNC_JMP:
+        {
+            // #  address R/W description
+            //--- ------- --- -------------------------------------------------
+            // 2    PC     R  fetch low address byte, increment PC
+            // 3    PC     R  copy low address byte to PCL, fetch high address
+            //                byte to PCH
+            ADD_ACTION_COPY_SHORT(cpu::ADDRESS_PC_PTR_ADVANCE, cpu::ADDRESS_TEMP, cpu::COPY_NONE);
+            ADD_ACTION_COPY_SHORT(cpu::ADDRESS_TEMP,           cpu::ADDRESS_PC,   cpu::COPY_NONE);
+        } break;
+        case cpu::FUNC_LDX:
+        {
+            // #  address R/W description
+            //--- ------- --- ------------------------------------------
+            // 2    PC     R  fetch low byte of address, increment PC
+            // 3    PC     R  fetch high byte of address, increment PC
+            // 4  address  R  read from effective address
+            action_index += fill_action_list_read(mode, cpu::ADDRESS_X, action_list_out);
+        } break;
+        case cpu::FUNC_STX:
+        {
+            action_index += fill_action_list_write(mode, cpu::ADDRESS_X, action_list_out);
+        } break;
+    }
+
+    return action_index;
+}
+
+#undef ADD_ACTION_COPY
+#undef ADD_ACTION_COPY_SHORT
+#undef ADD_ACTION_READ
+#undef ADD_ACTION_READ_BYTE
+#undef ADD_ACTION_WRITE_BYTE
+
+static void do_action_copy_short(const cpu::action action)
+{
+    uint16_t data = 0x0;
+    switch(action.copy_short_data.from)
+    {
+        case cpu::ADDRESS_PC_PTR_ADVANCE:
+            data     = ((uint16_t) cpu::read_memory(cpu::pc + 1) << 8) | cpu::read_memory(cpu::pc);
+            cpu::pc += 0x02;
+            break;
+        case cpu::ADDRESS_TEMP:
+            data = address_temp;
+            break;
+    }
+
+    switch(action.copy_short_data.to)
+    {
+        case cpu::ADDRESS_TEMP:
+            address_temp = data;
+            break;
+        case cpu::ADDRESS_PC:
+            cpu::pc = data;
+            break;
+    }
+}
+
+static void do_action(const cpu::action action)
 {
     switch(action.id)
     {
         case cpu::ID_INCREMENT_PC:
             cpu::pc += 0x01;
             break;
+        case cpu::ID_COPY_SHORT:
+        {
+            do_action_copy_short(action);
+        } break;
+        case cpu::ID_READ_BYTE:
+        {
+            uint8_t data = 0x0;
+            switch(action.read_byte_data.address)
+            {
+                case cpu::ADDRESS_TEMP:
+                    data = address_temp;
+                    break;
+            }
+
+            switch(action.read_byte_data.to)
+            {
+                case cpu::ADDRESS_X:
+                    cpu::x = data;
+                    break;
+            }
+
+        } break;
         case cpu::ID_COPY_BYTE:
         {
             uint8_t data = 0x0;
             switch(action.copy_byte_data.from)
             {
-                case cpu::ADDRESS_PC:
-                    data = read_address(mode, cpu::pc);
+                case cpu::ADDRESS_PC_ADVANCE:
+                    data     = cpu::pc;
+                    cpu::pc += 0x01;
                     break;
-                case cpu::ADDRESS_TEMP:
-                    data = address_temp;
+                case cpu::ADDRESS_PC_PTR_ADVANCE:
+                    data     = cpu::read_memory(cpu::pc);
+                    cpu::pc += 0x01;
+                    break;
             }
 
             switch(action.copy_byte_data.to)
             {
-                case cpu::ADDRESS_TEMP:
-                    address_temp = data;
-                    break;
-                case cpu::ADDRESS_PC_LO:
-                    cpu::pc = data;
-                    break;
-            }
-
-            switch(action.copy_byte_data.copy_behaviour)
-            {
-                case cpu::COPY_INCREMENT_PC:
-                    cpu::pc += 0x01;
-                    break;
-                case cpu::COPY_SET_PC:
-                    cpu::pc = ((uint16_t) read_address(mode, cpu::pc) << 8) | data;
+                case cpu::ADDRESS_X:
+                    cpu::x = data;
                     break;
             }
 
         } break;
+        case cpu::ID_NOP:
+            break;
     }
 }
 
@@ -172,39 +282,35 @@ void cpu::initialize(const rom* rom)
     memcpy(prg_rom, rom->data_prg, rom->header.page_count_prg * BLOCK_SIZE_PRG);
 }
 
-uint8_t cpu::read_address(cpu::address_mode mode, uint16_t op)
+uint8_t cpu::read_memory(uint16_t addr)
 {
-    switch(mode)
+    if (addr >= 0x8000)
     {
-        case cpu::MODE_ACCUMULATOR:        assert(0 && "read_instruction: accumulator not implemented"); return 0;
-        case cpu::MODE_ABSOLUTE:           return read_memory(op);
-        case cpu::MODE_ABSOLUTE_X_INDEXED: assert(0 && "read_instruction: absolute_x_indexed not implemented"); return 0;
-        case cpu::MODE_ABSOLUTE_y_INDEXED: assert(0 && "read_instruction: absolute_y_indexed not implemented"); return 0;
-        case cpu::MODE_IMMEDIATE:          return (uint8_t) op;
-        case cpu::MODE_IMPLIED:            assert(0 && "read_instruction: implied not implemented"); return 0;
-        case cpu::MODE_INDIRECT:           assert(0 && "read_instruction: indirect not implemented"); return 0;
-        case cpu::MODE_X_INDEXED_INDIRECT: assert(0 && "read_instruction: x_indexed_indirect not implemented"); return 0;
-        case cpu::MODE_INDIRECT_Y_INDEXED: assert(0 && "read_instruction: indirect_y_indexed not implemented"); return 0;
-        case cpu::MODE_RELATIVE:           assert(0 && "read_instruction: relative not implemented"); return 0;
-        case cpu::MODE_ZEROPAGE:           assert(0 && "read_instruction: zeropage not implemented"); return 0;
-        case cpu::MODE_ZEROPAGE_X_INDEXED: assert(0 && "read_instruction: zeropage_x_indexed not implemented"); return 0;
-        case cpu::MODE_ZEROPAGE_Y_INDEXED: assert(0 && "read_instruction: zeropage_y_indexed not implemented"); return 0;
-        case cpu::MODE_UNUSED:             assert(0 && "read_instruction: unused not implemented"); return 0;
+        return cpu::prg_rom[(addr - 0x8000) % 0x4000];
+    }
+    else
+    {
+        assert(0 && "Not implemented!");
     }
 
     return 0;
 }
 
+cpu::address_mode cpu::get_address_mode(const cpu::instruction inst)
+{
+    uint8_t lut_index = inst.bits.bbb + inst.bits.cc * 8;
+    return address_mode_lut[lut_index].mode;
+}
+
 cpu::instruction_meta cpu::get_instruction_meta(const cpu::instruction inst)
 {
-    switch(inst.bits.cc)
-    {
-        case 0: return instruction_meta_table[inst.bits.aaa];
-        case 1: return instruction_meta_table[inst.bits.aaa + 8];
-        case 2: return instruction_meta_table[inst.bits.aaa + 16];
-    }
+    return instruction_meta_table[inst.bits.aaa + inst.bits.cc * 8];
+}
 
-    return instruction_meta_table[0];
+const char* cpu::get_address_mode_str(const cpu::instruction inst)
+{
+    uint8_t lut_index = inst.bits.bbb + inst.bits.cc * 8;
+    return address_mode_lut[lut_index].mode_str;
 }
 
 cpu::instruction cpu::get_next_instruction()
@@ -214,11 +320,16 @@ cpu::instruction cpu::get_next_instruction()
     const uint8_t aaa_bits = 0x07;
 
     cpu::instruction inst = {};
-    inst.code             = read_memory(pc);
+    inst.code             = cpu::read_memory(pc);
     inst.bits.cc          = inst.code & cc_bits;
     inst.bits.bbb         = (inst.code >> 2) & bbb_bits;
     inst.bits.aaa         = (inst.code >> 5) & aaa_bits;
     inst.address_mode     = get_address_mode(inst);
+
+    // fetching the instruction and increasing pc is always the first cycle
+    cpu::instruction_meta meta  = get_instruction_meta(inst);
+    inst.cycles[0]              = cpu::action(cpu::ID_INCREMENT_PC);
+    inst.cycle_count            = 1 + fill_action_list(meta, get_address_mode(inst), &inst.cycles[1]);
 
     return inst;
 }
@@ -226,15 +337,9 @@ cpu::instruction cpu::get_next_instruction()
 void cpu::execute(const cpu::instruction inst)
 {
     uint8_t cycle = 0;
-
-    // fetching the instruction and increasing pc is always the first cycle
-    cpu::instruction_meta meta  = get_instruction_meta(inst);
-    cpu::action action_list[16] = { cpu::action(cpu::ID_INCREMENT_PC) };
-    fill_action_list(meta, &action_list[1]);
-
-    while(cycle < meta.cycle_count)
+    while(cycle < inst.cycle_count)
     {
-        do_action(action_list[cycle], inst.address_mode);
+        do_action(inst.cycles[cycle]);
         cycle++;
     }
 }
