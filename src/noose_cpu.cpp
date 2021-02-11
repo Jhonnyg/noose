@@ -125,17 +125,6 @@ static uint8_t fill_action_list_read(cpu::address_mode mode, cpu::action_address
         {
             ADD_ACTION_COPY_BYTE(cpu::ADDRESS_PC_PTR_ADVANCE, dst, behaviour);
         } break;
-        case cpu::MODE_ABSOLUTE_X_INDEXED: break;
-        case cpu::MODE_ABSOLUTE_y_INDEXED: break;
-        case cpu::MODE_IMPLIED: break;
-        case cpu::MODE_INDIRECT: break;
-        case cpu::MODE_X_INDEXED_INDIRECT: break;
-        case cpu::MODE_INDIRECT_Y_INDEXED: break;
-        case cpu::MODE_RELATIVE: break;
-        case cpu::MODE_ZEROPAGE: break;
-        case cpu::MODE_ZEROPAGE_X_INDEXED: break;
-        case cpu::MODE_ZEROPAGE_Y_INDEXED: break;
-        case cpu::MODE_UNUSED: break;
     }
 
     return action_index;
@@ -149,7 +138,7 @@ static uint8_t fill_action_list_write(cpu::address_mode mode, cpu::action_addres
         case cpu::MODE_ZEROPAGE:
         {
             ADD_ACTION_COPY_BYTE(cpu::ADDRESS_PC_PTR_ADVANCE, cpu::ADDRESS_TEMP_LO, cpu::action_behaviour());
-            ADD_ACTION_WRITE_BYTE(from, cpu::ADDRESS_TEMP_LO, cpu::action_behaviour());
+            ADD_ACTION_WRITE_BYTE(from,                       cpu::ADDRESS_TEMP_LO, cpu::action_behaviour());
         } break;
     }
     return action_index;
@@ -335,7 +324,7 @@ static void do_action(const cpu::action action)
                     address_temp = (address_temp & 0xf0) + (uint16_t) data;
                     break;
             }
-            
+
             do_behaviour(action.behaviour, data);
 
         } break;
