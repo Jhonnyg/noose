@@ -20,7 +20,7 @@ static uint16_t address_temp;
 
 static cpu::instruction_meta instruction_meta_table[] = {
     { "NOP",     cpu::FUNC_NOP },
-    { "BIT",     cpu::FUNC_NOP },
+    { "BIT",     cpu::FUNC_BIT },
     { "JMP",     cpu::FUNC_JMP },
     { "JMP_ABS", cpu::FUNC_NOP },
     { "STY",     cpu::FUNC_NOP },
@@ -45,6 +45,11 @@ static cpu::instruction_meta instruction_meta_table[] = {
     { "LDX",     cpu::FUNC_LDX },
     { "DEC",     cpu::FUNC_NOP },
     { "INC",     cpu::FUNC_NOP },
+    // Extra
+    { "BRK",     cpu::FUNC_NOP },
+    { "JSR",     cpu::FUNC_JSR },
+    { "RTI",     cpu::FUNC_NOP },
+    { "RTS",     cpu::FUNC_NOP },
 };
 
 struct address_mode_lut_entry
@@ -107,6 +112,8 @@ static address_mode_lut_entry address_mode_lut[] =
 #define ADD_ACTION_COPY_BYTE(f, t, b)  (ADD_ACTION_COPY(byte, f, t, b))
 #define ADD_ACTION_READ_BYTE(a, t, b)  (ADD_ACTION_READ(byte, a, t, b))
 #define ADD_ACTION_WRITE_BYTE(f, a, b) (ADD_ACTION_WRITE(byte, f, a, b))
+#define ADD_ACTION_PUSH_BYTE(f) action_list_out[action_index++] = cpu::action((cpu::action::push_byte) { .from = f })
+#define ADD_ACTION_NOP()        action_list_out[action_index++] = cpu::action()
 
 static uint8_t fill_action_list_read(cpu::address_mode mode, cpu::action_address dst, cpu::action_behaviour behaviour, cpu::action* action_list_out)
 {
@@ -150,8 +157,7 @@ static uint8_t fill_action_list(const cpu::instruction_meta meta, cpu::address_m
 
     switch(meta.type)
     {
-        case cpu::FUNC_NOP:
-            break;
+        case cpu::FUNC_NOP: break;
         case cpu::FUNC_JMP:
         {
             // #  address R/W description
@@ -177,6 +183,27 @@ static uint8_t fill_action_list(const cpu::instruction_meta meta, cpu::address_m
         {
             action_index += fill_action_list_write(mode, cpu::ADDRESS_X, action_list_out);
         } break;
+        case cpu::FUNC_BIT:
+        {
+            action_index += fill_action_list_read(mode, cpu::ADDRESS_NONE,
+                cpu::action_behaviour(cpu::ID_BIT_TEST), action_list_out);
+        } break;
+        case cpu::FUNC_JSR:
+        {
+            // #  address R/W description
+            //--- ------- --- -------------------------------------------------
+            // 2    PC     R  fetch low address byte, increment PC
+            // 3  $0100,S  R  internal operation (predecrement S?)
+            // 4  $0100,S  W  push PCH on stack, decrement S
+            // 5  $0100,S  W  push PCL on stack, decrement S
+            // 6    PC     R  copy low address byte to PCL, fetch high address
+            //                byte to PCH
+            ADD_ACTION_COPY_SHORT(cpu::ADDRESS_PC_PTR_ADVANCE, cpu::ADDRESS_TEMP, cpu::action_behaviour());
+            ADD_ACTION_NOP();
+            ADD_ACTION_PUSH_BYTE(cpu::ADDRESS_PC_HI);
+            ADD_ACTION_PUSH_BYTE(cpu::ADDRESS_PC_LO);
+            ADD_ACTION_COPY_SHORT(cpu::ADDRESS_TEMP, cpu::ADDRESS_PC, cpu::action_behaviour());
+        } break;
     }
 
     return action_index;
@@ -187,6 +214,7 @@ static uint8_t fill_action_list(const cpu::instruction_meta meta, cpu::address_m
 #undef ADD_ACTION_READ
 #undef ADD_ACTION_READ_BYTE
 #undef ADD_ACTION_WRITE_BYTE
+#undef ADD_ACTION_NOP
 
 static void do_action_copy_short(const cpu::action action)
 {
@@ -374,7 +402,18 @@ cpu::address_mode cpu::get_address_mode(const cpu::instruction inst)
 
 cpu::instruction_meta cpu::get_instruction_meta(const cpu::instruction inst)
 {
-    return instruction_meta_table[inst.bits.aaa + inst.bits.cc * 8];
+    const uint8_t ccc_table_size     = 8;
+    const uint8_t extra_table_offset = ccc_table_size * 3;
+
+    switch(inst.code)
+    {
+        case 0x00: return instruction_meta_table[extra_table_offset + 0];
+        case 0x20: return instruction_meta_table[extra_table_offset + 1];
+        case 0x40: return instruction_meta_table[extra_table_offset + 2];
+        case 0x60: return instruction_meta_table[extra_table_offset + 3];
+    }
+
+    return instruction_meta_table[inst.bits.aaa + inst.bits.cc * ccc_table_size];
 }
 
 const char* cpu::get_address_mode_str(const cpu::instruction inst)

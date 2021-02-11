@@ -137,6 +137,19 @@ void noose::reset_rom(noose::rom* rom)
     memset(rom, 0, sizeof(*rom));
 }
 
+static inline uint8_t dbg_write_instruction_to_buffer_one_op(const noose::cpu::instruction_meta meta, char* buffer)
+{
+    int op0 = noose::cpu::read_memory(noose::cpu::pc + 1);
+    return sprintf(buffer, "%02X     %s #$%02X", op0, meta.name, op0);
+}
+
+static inline uint8_t dbg_write_instruction_to_buffer_two_op(const noose::cpu::instruction_meta meta, char* buffer)
+{
+    int op0 = noose::cpu::read_memory(noose::cpu::pc + 1);
+    int op1 = noose::cpu::read_memory(noose::cpu::pc + 2);
+    return sprintf(buffer, "%02X %02X  %s $%02X%02X", op0, op1, meta.name, op1, op0);
+}
+
 static uint8_t dbg_write_instruction_to_buffer(const noose::cpu::instruction i, char* buffer)
 {
     noose::cpu::instruction_meta meta = noose::cpu::get_instruction_meta(i);
@@ -145,9 +158,7 @@ static uint8_t dbg_write_instruction_to_buffer(const noose::cpu::instruction i, 
     {
         case noose::cpu::FUNC_JMP:
         {
-            int op0 = noose::cpu::read_memory(noose::cpu::pc + 1);
-            int op1 = noose::cpu::read_memory(noose::cpu::pc + 2);
-            return sprintf(buffer, "%02X %02X  %s $%02X%02X", op0, op1, meta.name, op1, op0);
+            return dbg_write_instruction_to_buffer_two_op(meta, buffer);
         }
         case noose::cpu::FUNC_LDX:
         {
@@ -170,7 +181,14 @@ static uint8_t dbg_write_instruction_to_buffer(const noose::cpu::instruction i, 
                 return sprintf(buffer, "%02X     %s $%02X = %02X", op0, meta.name, op0, noose::cpu::x);
             }
         }
-        case noose::cpu::FUNC_NOP: break;
+        case noose::cpu::FUNC_JSR:
+        {
+            return dbg_write_instruction_to_buffer_two_op(meta, buffer);
+        }
+        case noose::cpu::FUNC_NOP:
+        {
+            return dbg_write_instruction_to_buffer_one_op(meta, buffer);
+        }
     }
 
     return 0;

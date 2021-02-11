@@ -34,6 +34,8 @@ namespace noose
             FUNC_JMP = 1,
             FUNC_LDX = 2,
             FUNC_STX = 3,
+            FUNC_BIT = 4,
+            FUNC_JSR = 5,
         };
 
         enum cpu_flag
@@ -47,6 +49,12 @@ namespace noose
             CPU_FLAG_NEGATIVE    = 128,
         };
 
+        enum action_address_bits
+        {
+            HI,
+            LO,
+        };
+
         enum action_address
         {
             ADDRESS_NONE,
@@ -54,6 +62,8 @@ namespace noose
             ADDRESS_X,
             ADDRESS_Y,
             ADDRESS_PC,
+            ADDRESS_PC_HI,
+            ADDRESS_PC_LO,
             ADDRESS_PC_ADVANCE,
             ADDRESS_PC_PTR,
             ADDRESS_PC_PTR_ADVANCE,
@@ -87,6 +97,7 @@ namespace noose
         {
             ID_NONE,
             ID_SET_FLAGS,
+            ID_BIT_TEST,
         };
 
         struct action_behaviour
@@ -103,8 +114,9 @@ namespace noose
                 struct set_flags set_flags_data;
             };
 
-            action_behaviour()               : id(ID_NONE) {}
-            action_behaviour(set_flags data) : id(ID_SET_FLAGS), set_flags_data(data) {}
+            action_behaviour()                       : id(ID_NONE) {}
+            action_behaviour(action_behaviour_id id) : id(id) {}
+            action_behaviour(set_flags data)         : id(ID_SET_FLAGS), set_flags_data(data) {}
 
             static inline set_flags set_flags(uint8_t mask)
             {
@@ -142,12 +154,18 @@ namespace noose
                 action_address address;
             };
 
+            struct push_byte
+            {
+                action_address from;
+            };
+
             union
             {
                 struct copy_byte  copy_byte_data;
                 struct copy_short copy_short_data;
                 struct read_byte  read_byte_data;
                 struct write_byte write_byte_data;
+                struct push_byte  push_byte_data;
             };
 
             action()                                            : id(ID_NOP) {}
@@ -156,6 +174,7 @@ namespace noose
             action(copy_short data, action_behaviour behaviour) : id(ID_COPY_SHORT), copy_short_data(data), behaviour(behaviour) {}
             action(read_byte data, action_behaviour behaviour)  : id(ID_READ_BYTE),  read_byte_data(data), behaviour(behaviour)  {}
             action(write_byte data, action_behaviour behaviour) : id(ID_WRITE_BYTE), write_byte_data(data), behaviour(behaviour) {}
+            action(push_byte data)                              : id(ID_WRITE_BYTE), push_byte_data(data) {}
         };
 
         struct s_instruction
