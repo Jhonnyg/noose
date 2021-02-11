@@ -10,6 +10,7 @@ solution "noose"
     configurations { "Debug", "Release" }
     platforms      { "x64" }
     flags          { "NoPCH" } -- "FatalWarnings",
+    buildoptions   { "-Wno-switch"}
 
     configuration "Debug"
         defines { "DEBUG" }

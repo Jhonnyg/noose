@@ -87,28 +87,28 @@ static address_mode_lut_entry address_mode_lut[] =
 
 #define ADD_ACTION_COPY(type, f, t, b) \
     { \
-        cpu::action::copy_##type ac = { .from = f, .to = t, .copy_behaviour = b }; \
-        action_list_out[action_index++] = cpu::action(ac); \
+        cpu::action::copy_##type ac = { .from = f, .to = t}; \
+        action_list_out[action_index++] = cpu::action(ac, b); \
     }
 
 #define ADD_ACTION_READ(type, a, t, b) \
     { \
-        cpu::action::read_##type ac = { .address = a, .to = t, .read_behaviour = b }; \
-        action_list_out[action_index++] = cpu::action(ac); \
+        cpu::action::read_##type ac = { .address = a, .to = t}; \
+        action_list_out[action_index++] = cpu::action(ac, b); \
     }
 
-#define ADD_ACTION_WRITE(type, f, a) \
+#define ADD_ACTION_WRITE(type, f, a, b) \
     { \
         cpu::action::write_##type ac    = { .from = f, .address = a }; \
-        action_list_out[action_index++] = cpu::action(ac); \
+        action_list_out[action_index++] = cpu::action(ac, b); \
     }
 
 #define ADD_ACTION_COPY_SHORT(f, t, b) (ADD_ACTION_COPY(short, f, t, b))
 #define ADD_ACTION_COPY_BYTE(f, t, b)  (ADD_ACTION_COPY(byte, f, t, b))
 #define ADD_ACTION_READ_BYTE(a, t, b)  (ADD_ACTION_READ(byte, a, t, b))
-#define ADD_ACTION_WRITE_BYTE(f, a)    (ADD_ACTION_WRITE(byte, f, a))
+#define ADD_ACTION_WRITE_BYTE(f, a, b) (ADD_ACTION_WRITE(byte, f, a, b))
 
-static uint8_t fill_action_list_read(cpu::address_mode mode, cpu::action_address dst, cpu::action* action_list_out)
+static uint8_t fill_action_list_read(cpu::address_mode mode, cpu::action_address dst, cpu::action_behaviour behaviour, cpu::action* action_list_out)
 {
     uint8_t action_index = 0;
     switch(mode)
@@ -123,7 +123,7 @@ static uint8_t fill_action_list_read(cpu::address_mode mode, cpu::action_address
         } break;
         case cpu::MODE_IMMEDIATE:
         {
-            ADD_ACTION_COPY_BYTE(cpu::ADDRESS_PC_PTR_ADVANCE, dst, cpu::COPY_NONE);
+            ADD_ACTION_COPY_BYTE(cpu::ADDRESS_PC_PTR_ADVANCE, dst, behaviour);
         } break;
         case cpu::MODE_ABSOLUTE_X_INDEXED: break;
         case cpu::MODE_ABSOLUTE_y_INDEXED: break;
@@ -148,8 +148,8 @@ static uint8_t fill_action_list_write(cpu::address_mode mode, cpu::action_addres
     {
         case cpu::MODE_ZEROPAGE:
         {
-            ADD_ACTION_COPY_BYTE(cpu::ADDRESS_PC_PTR_ADVANCE, cpu::ADDRESS_TEMP_LO, cpu::COPY_NONE);
-            ADD_ACTION_WRITE_BYTE(from, cpu::ADDRESS_TEMP_LO);
+            ADD_ACTION_COPY_BYTE(cpu::ADDRESS_PC_PTR_ADVANCE, cpu::ADDRESS_TEMP_LO, cpu::action_behaviour());
+            ADD_ACTION_WRITE_BYTE(from, cpu::ADDRESS_TEMP_LO, cpu::action_behaviour());
         } break;
     }
     return action_index;
@@ -170,8 +170,8 @@ static uint8_t fill_action_list(const cpu::instruction_meta meta, cpu::address_m
             // 2    PC     R  fetch low address byte, increment PC
             // 3    PC     R  copy low address byte to PCL, fetch high address
             //                byte to PCH
-            ADD_ACTION_COPY_SHORT(cpu::ADDRESS_PC_PTR_ADVANCE, cpu::ADDRESS_TEMP, cpu::COPY_NONE);
-            ADD_ACTION_COPY_SHORT(cpu::ADDRESS_TEMP,           cpu::ADDRESS_PC,   cpu::COPY_NONE);
+            ADD_ACTION_COPY_SHORT(cpu::ADDRESS_PC_PTR_ADVANCE, cpu::ADDRESS_TEMP, cpu::action_behaviour());
+            ADD_ACTION_COPY_SHORT(cpu::ADDRESS_TEMP,           cpu::ADDRESS_PC,   cpu::action_behaviour());
         } break;
         case cpu::FUNC_LDX:
         {
@@ -180,7 +180,9 @@ static uint8_t fill_action_list(const cpu::instruction_meta meta, cpu::address_m
             // 2    PC     R  fetch low byte of address, increment PC
             // 3    PC     R  fetch high byte of address, increment PC
             // 4  address  R  read from effective address
-            action_index += fill_action_list_read(mode, cpu::ADDRESS_X, action_list_out);
+            action_index += fill_action_list_read(mode, cpu::ADDRESS_X,
+                cpu::action_behaviour::set_flags(cpu::CPU_FLAG_NEGATIVE | cpu::CPU_FLAG_ZERO),
+                action_list_out);
         } break;
         case cpu::FUNC_STX:
         {
@@ -222,6 +224,45 @@ static void do_action_copy_short(const cpu::action action)
     }
 }
 
+static void do_behaviour(const cpu::action_behaviour behaviour, uint8_t result)
+{
+    switch(behaviour.id)
+    {
+        case cpu::ID_SET_FLAGS:
+        {
+            uint8_t mask = behaviour.set_flags_data.mask;
+            /*
+            if (mask & cpu::CPU_FLAG_CARRY)
+            {
+
+            }
+            */
+            if (mask & cpu::CPU_FLAG_ZERO && result == 0x0)
+            {
+                cpu::p |= cpu::CPU_FLAG_ZERO;
+            }
+            /*
+            if (mask & cpu::CPU_FLAG_IR_DISABLED)
+            {
+
+            }
+            if (mask & cpu::CPU_FLAG_DECIMAL)
+            {
+
+            }
+            if (mask & cpu::CPU_FLAG_OVERFLOW)
+            {
+
+            }
+            if (mask & cpu::CPU_FLAG_NEGATIVE)
+            {
+
+            }
+            */
+        } break;
+    }
+}
+
 static void do_action(const cpu::action action)
 {
     switch(action.id)
@@ -249,6 +290,8 @@ static void do_action(const cpu::action action)
                     cpu::x = data;
                     break;
             }
+
+            do_behaviour(action.behaviour, data);
 
         } break;
         case cpu::ID_WRITE_BYTE:
@@ -292,6 +335,8 @@ static void do_action(const cpu::action action)
                     address_temp = (address_temp & 0xf0) + (uint16_t) data;
                     break;
             }
+            
+            do_behaviour(action.behaviour, data);
 
         } break;
         case cpu::ID_NOP:

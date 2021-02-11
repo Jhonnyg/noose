@@ -36,6 +36,17 @@ namespace noose
             FUNC_STX = 3,
         };
 
+        enum cpu_flag
+        {
+            CPU_FLAG_CARRY       = 1,
+            CPU_FLAG_ZERO        = 2,
+            CPU_FLAG_IR_DISABLED = 4,
+            CPU_FLAG_DECIMAL     = 8,
+            // 2x NO EFFECT
+            CPU_FLAG_OVERFLOW    = 64,
+            CPU_FLAG_NEGATIVE    = 128,
+        };
+
         enum action_address
         {
             ADDRESS_NONE,
@@ -72,39 +83,57 @@ namespace noose
             ID_WRITE_BYTE,
         };
 
-        enum action_copy_behaviour
+        enum action_behaviour_id
         {
-            COPY_NONE,
+            ID_NONE,
+            ID_SET_FLAGS,
         };
 
-        enum action_read_behaviour
+        struct action_behaviour
         {
-            READ_NONE,
+            action_behaviour_id id;
+
+            struct set_flags
+            {
+                uint8_t mask;
+            };
+
+            union
+            {
+                struct set_flags set_flags_data;
+            };
+
+            action_behaviour()               : id(ID_NONE) {}
+            action_behaviour(set_flags data) : id(ID_SET_FLAGS), set_flags_data(data) {}
+
+            static inline set_flags set_flags(uint8_t mask)
+            {
+                struct set_flags f = { .mask = mask };
+                return f;
+            }
         };
 
         struct action
         {
             action_id id;
+            action_behaviour behaviour;
 
             struct copy_byte
             {
-                action_address        from;
-                action_address        to;
-                action_copy_behaviour copy_behaviour;
+                action_address   from;
+                action_address   to;
             };
 
             struct copy_short
             {
-                action_address        from;
-                action_address        to;
-                action_copy_behaviour copy_behaviour;
+                action_address   from;
+                action_address   to;
             };
 
             struct read_byte
             {
-                action_address        address;
-                action_address        to;
-                action_read_behaviour read_behaviour;
+                action_address   address;
+                action_address   to;
             };
 
             struct write_byte
@@ -121,12 +150,12 @@ namespace noose
                 struct write_byte write_byte_data;
             };
 
-            action()                : id(ID_NOP) {}
-            action(action_id id)    : id(id) {}
-            action(copy_byte data)  : id(ID_COPY_BYTE),  copy_byte_data(data)  {}
-            action(copy_short data) : id(ID_COPY_SHORT), copy_short_data(data) {}
-            action(read_byte data)  : id(ID_READ_BYTE),  read_byte_data(data)  {}
-            action(write_byte data) : id(ID_WRITE_BYTE), write_byte_data(data) {}
+            action()                                            : id(ID_NOP) {}
+            action(action_id id)                                : id(id) {}
+            action(copy_byte data, action_behaviour behaviour)  : id(ID_COPY_BYTE),  copy_byte_data(data), behaviour(behaviour)  {}
+            action(copy_short data, action_behaviour behaviour) : id(ID_COPY_SHORT), copy_short_data(data), behaviour(behaviour) {}
+            action(read_byte data, action_behaviour behaviour)  : id(ID_READ_BYTE),  read_byte_data(data), behaviour(behaviour)  {}
+            action(write_byte data, action_behaviour behaviour) : id(ID_WRITE_BYTE), write_byte_data(data), behaviour(behaviour) {}
         };
 
         struct s_instruction
