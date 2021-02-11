@@ -125,6 +125,17 @@ static uint8_t fill_action_list_read(cpu::address_mode mode, cpu::action_address
         {
             ADD_ACTION_COPY_BYTE(cpu::ADDRESS_PC_PTR_ADVANCE, dst, cpu::COPY_NONE);
         } break;
+        case cpu::MODE_ABSOLUTE_X_INDEXED: break;
+        case cpu::MODE_ABSOLUTE_y_INDEXED: break;
+        case cpu::MODE_IMPLIED: break;
+        case cpu::MODE_INDIRECT: break;
+        case cpu::MODE_X_INDEXED_INDIRECT: break;
+        case cpu::MODE_INDIRECT_Y_INDEXED: break;
+        case cpu::MODE_RELATIVE: break;
+        case cpu::MODE_ZEROPAGE: break;
+        case cpu::MODE_ZEROPAGE_X_INDEXED: break;
+        case cpu::MODE_ZEROPAGE_Y_INDEXED: break;
+        case cpu::MODE_UNUSED: break;
     }
 
     return action_index;
@@ -368,6 +379,3 @@ void cpu::execute(const cpu::instruction inst)
         cycle++;
     }
 }
-
-
-

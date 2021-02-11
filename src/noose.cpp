@@ -169,8 +169,8 @@ static uint8_t dbg_write_instruction_to_buffer(const noose::cpu::instruction i, 
             {
                 return sprintf(buffer, "%02X     %s $%02X = %02X", op0, meta.name, op0, noose::cpu::x);
             }
-            //STX $00 = 00
         }
+        case noose::cpu::FUNC_NOP: break;
     }
 
     return 0;
@@ -227,7 +227,7 @@ bool noose::verify_rom(const noose::rom* rom, const char* verify_log_path)
         #define COLOR_YEL  "\x1B[33m"
 
         uint16_t cursor = 0;
-        const char* last_color = COLOR_NRM;
+        uint64_t last_color = (uint64_t) &COLOR_NRM;
 
         sprintf(buffer_noose, "%04X  %02X %-39sA:%02X X:%02X Y:%02X P:%02X SP:%02X PPU:%3d,%3d CYC:%d",
             pc, next.code, instruction_str, reg_a, reg_x, reg_y, p, sp, ppu_x, ppu_y, cycle_count);
@@ -236,29 +236,29 @@ bool noose::verify_rom(const noose::rom* rom, const char* verify_log_path)
         {
             if (cursor >= 74 && cursor < 86)
             {
-                if (last_color != COLOR_YEL)
+                if (last_color != (uint64_t) &COLOR_YEL)
                 {
                     printf("%s", COLOR_YEL);
-                    last_color = COLOR_YEL;
+                    last_color = (uint64_t) &COLOR_YEL;
                 }
                 printf("%c", buffer_log[cursor]);
             }
             else if (buffer_noose[cursor] == buffer_log[cursor])
             {
-                if (last_color != COLOR_GRN)
+                if (last_color != (uint64_t) &COLOR_GRN)
                 {
                     printf("%s", COLOR_GRN);
-                    last_color = COLOR_GRN;
+                    last_color = (uint64_t) &COLOR_GRN;
                 }
 
                 printf("%c", buffer_log[cursor]);
             }
             else
             {
-                if (last_color != COLOR_RED)
+                if (last_color != (uint64_t) &COLOR_RED)
                 {
                     printf("%s", COLOR_RED);
-                    last_color = COLOR_RED;
+                    last_color = (uint64_t) &COLOR_RED;
                 }
 
                 printf("%c", buffer_log[cursor]);

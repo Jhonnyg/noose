@@ -9,7 +9,7 @@ solution "noose"
 
     configurations { "Debug", "Release" }
     platforms      { "x64" }
-    flags          { "FatalWarnings", "NoPCH" }
+    flags          { "NoPCH" } -- "FatalWarnings",
 
     configuration "Debug"
         defines { "DEBUG" }
